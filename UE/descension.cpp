@@ -255,7 +255,7 @@ static struct CrosshairSettings : Marker {
         marker_style = MarkerStyle::kDot;
         marker_size = 3;
         marker_thickness = 1;
-        marker_colour = {255, 0, 255, 255};
+        marker_colour = {0, 255, 0, 255};
     }
 } crosshair_settings;
 
@@ -1779,6 +1779,10 @@ void HookUnrealEngine4(void) {
     DetourAttach(&(PVOID&)hooks::processevent::original_processevent, hooks::processevent::ProcessEvent);
     DetourTransactionCommit();
     */
+
+    game_data::screen_size = FVector2D(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
+    game_data::screen_center = FVector2D(ImGui::GetIO().DisplaySize.x/2, ImGui::GetIO().DisplaySize.y/2);
+
 }
 
 void DrawImGuiInUE4(void) {
@@ -1840,11 +1844,14 @@ void DrawImGuiInUE4(void) {
 
     if (visuals::crosshair_settings.enabled) {
         static ImVec2 window_size(30, 30);
-        ImGui::SetNextWindowPos({game_data::screen_center.X - window_size.x / 2, game_data::screen_center.Y - window_size.y / 2});
+
+        ImVec2 display_size = ImGui::GetIO().DisplaySize;
+
+        ImGui::SetNextWindowPos({display_size.x / 2 - window_size.x / 2, display_size.y / 2 - window_size.y / 2});
         ImGui::SetNextWindowSize(window_size);
         ImGui::Begin("crosshair", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-        imgui::visuals::DrawMarker((imgui::visuals::MarkerStyle)visuals::crosshair_settings.marker_style, {game_data::screen_center.X, game_data::screen_center.Y}, visuals::crosshair_settings.marker_colour, visuals::crosshair_settings.marker_size, visuals::crosshair_settings.marker_thickness);
+        imgui::visuals::DrawMarker((imgui::visuals::MarkerStyle)visuals::crosshair_settings.marker_style, {display_size.x / 2, display_size.y / 2}, visuals::crosshair_settings.marker_colour, visuals::crosshair_settings.marker_size, visuals::crosshair_settings.marker_thickness);
 
         ImGui::End();
     }
