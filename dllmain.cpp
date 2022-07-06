@@ -1,16 +1,21 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "DX11.h"
-//#include <iostream>
-//#include <Windows.h>
+
+//#define ALLOC_CONSOLE
+
+#ifdef ALLOC_CONSOLE
+#include <iostream>
+#include <Windows.h>
+#endif
 
 void OnDLLProcessAttach(void) {
-    /*
+    #ifdef ALLOC_CONSOLE
     AllocConsole();
     freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
     freopen("CONIN$", "r", stdin);
     freopen("CONOUT$", "w", stdout);
     freopen("CONOUT$", "w", stderr);
-    */
+    #endif
     bool result = dx11::Hook();
 }
 

@@ -4,7 +4,7 @@
 using namespace std;
 using namespace CG;
 static DWORD64 uworld_offset = 0;
-//static const DWORD64 processevent_offset = 0xEE57C0;
+// static const DWORD64 processevent_offset = 0xEE57C0;
 static DWORD64 base_address = NULL;
 
 class UWorldProxy {
@@ -192,8 +192,8 @@ static FORCEINLINE int32 RandRange(int32 Min, int32 Max) {
 namespace imgui {
 
 namespace visuals {
-static enum MarkerStyle { kNone, kDot, kCircle, kFilledSquare, kSquare };
-static const char* marker_labels[] = {"None", "Dot", "Circle", "Filled square", "Square"};
+static enum MarkerStyle { kNone, kDot, kCircle, kFilledSquare, kSquare, kBounds, kFilledBounds };
+static const char* marker_labels[] = {"None", "Dot", "Circle", "Filled square", "Square", "Bounds", "Filled bounds"};
 
 struct Marker {
     MarkerStyle marker_style = MarkerStyle::kSquare;
@@ -207,10 +207,10 @@ static struct AimbotVisualSettings : Marker {
     int distance_for_scaling = 5000;
     int minimum_marker_size = 3;
     AimbotVisualSettings(void) {
-        marker_style = MarkerStyle::kCircle;
+        marker_style = MarkerStyle::kFilledBounds;
         marker_size = 9;
         marker_thickness = 2;
-        marker_colour = {255, 255, 0, 200};
+        marker_colour = {255, 255, 0, 125};
     }
 } aimbot_visual_settings;
 
@@ -712,12 +712,12 @@ FVector2D WorldToScreen(FVector world, FVector Rotation, FVector cameraPosition,
 
     auto tmpFOV = tanf(FovAngle * (float)PI / 360.f);
 
-   FVector2D screen;
+    FVector2D screen;
     screen.X = ScreenCenterX + vTransformed.X * (ScreenCenterX / tmpFOV) / vTransformed.Z;
     screen.Y = ScreenCenterY - vTransformed.Y * (ScreenCenterX / tanf(FovAngle * (float)PI / 360.f)) / vTransformed.Z;
     return screen;
 }
-}
+}  // namespace W2S
 
 namespace game_functions {
 bool InLineOfSight(AActor* actor) {
@@ -725,9 +725,7 @@ bool InLineOfSight(AActor* actor) {
     /*return game_data::local_player_controller->LineOfSightTo(actor, FVector(), false);*/
 }
 
-
 FVector2D Project(FVector location) {
-
     FRotator r = game_data::local_player->PlayerController->PlayerCameraManager->CameraCachePrivate.POV.Rotation;
     FVector cam_location = game_data::local_player->PlayerController->PlayerCameraManager->CameraCachePrivate.POV.Location;
     float fov = game_data::local_player->PlayerController->PlayerCameraManager->CameraCachePrivate.POV.FOV;
@@ -844,6 +842,8 @@ void Tick(void) {
         float height = abs(head_projection.Y - center_projection.Y);
         float width = esp_settings.width_to_height_ratio * height;
         esp_information.push_back({center_projection, height, same_team});
+
+        // cout << height << endl;
     }
 }
 }  // namespace esp
@@ -863,9 +863,9 @@ static struct AimbotSettings {
     bool enabled = true;          // enabling really just enables aimassist, this isnt really an aimbot
     bool target_everyone = true;  // if we want to do prediction on every single player
 
-    float tempest_ping_in_ms = 30;   //-90
-    float chaingun_ping_in_ms = 30;  //-50
-    float grenadelauncher_ping_in_ms = 30;
+    float tempest_ping_in_ms = 0;   //-90
+    float chaingun_ping_in_ms = 0;  //-50
+    float grenadelauncher_ping_in_ms = 0;
     float plasmagun_ping_in_ms = 0;
     float blaster_ping_in_ms = 0;
 
@@ -947,17 +947,16 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
     if (game_data::my_player.weapon_type_ != game_data::WeaponType::kProjectileArching && game_data::my_player.weapon_type_ != game_data::WeaponType::kProjectileLinear)
         return false;
 
-
-    FVector owner_location = game_data::my_player.location_ + offset*0;
+    FVector owner_location = game_data::my_player.location_ - offset;
     FVector owner_velocity = game_data::my_player.velocity_;
 
-    //owner_location = owner_location - owner_velocity * (weapon_parameters_.self_compensation_ping_ / 1000.0);
+    // owner_location = owner_location - owner_velocity * (weapon_parameters_.self_compensation_ping_ / 1000.0);
 
     FVector target_location = target_player->location_;
     FVector target_velocity = target_player->velocity_;
     FVector target_acceleration = target_player->velocity_ * 0;
 
-    //float ping_time = weapon_parameters_.ping_ / 1000.0;
+    // float ping_time = weapon_parameters_.ping_ / 1000.0;
 
     FVector prediction = target_location;
     FVector ping_prediction = target_location;
@@ -981,7 +980,7 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
         return false;
     }
 
-    float full_time = dt[i] + ping/1000.0;
+    float full_time = dt[i] + ping / 1000.0;
 
     ping_prediction = prediction = (target_location + (target_velocity * full_time * 1) + (target_acceleration * pow(dt[i], 2) * 0.5) - (1 ? (owner_velocity * (inheritence * full_time)) : FVector()));
 
@@ -990,7 +989,7 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
     return true;
 
     /*
-    */
+     */
 
     FVector muzzlePosition = game_data::my_player.location_ + offset;
     FVector targetPosition = target_player->location_ + (target_player->velocity_ * ping / 1000.0);
@@ -1196,7 +1195,7 @@ void Tick(void) {
         return;
 
     static FVector prediction;
-    FVector muzzle_offset = game_functions::GetMuzzleOffset();
+    FVector muzzle_offset = game_data::my_player.character_->Weapon->FireOffset;  // game_functions::GetMuzzleOffset();
 
     if (!aimbot_settings.target_everyone) {
         if (enabled && FindTarget() /*&& target_player.character_*/) {
@@ -1205,6 +1204,14 @@ void Tick(void) {
             if (result) {
                 FVector2D projection = game_functions::Project(prediction);
                 float height = -1;
+
+                if ((imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) && height == -1) {
+                    FVector2D center_projection = game_functions::Project(target_player.location_);
+                    target_player.location_.Z += esp::esp_settings.player_height;  // this is HALF the height in reality
+                    FVector2D head_projection = game_functions::Project(target_player.location_);
+                    target_player.location_.Z -= esp::esp_settings.player_height;  // this is HALF the height in reality
+                    height = abs(head_projection.Y - center_projection.Y);
+                }
 
                 projections_of_predictions.push_back(projection);
                 aimbot_information.push_back({(prediction - game_data::my_player.location_).Magnitude(), projection, height});
@@ -1231,6 +1238,14 @@ void Tick(void) {
             if (result) {
                 FVector2D projection = game_functions::Project(prediction);
                 float height = -1;
+
+                if ((imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) && height == -1) {
+                    FVector2D center_projection = game_functions::Project(player->location_);
+                    player->location_.Z += esp::esp_settings.player_height;  // this is HALF the height in reality
+                    FVector2D head_projection = game_functions::Project(player->location_);
+                    player->location_.Z -= esp::esp_settings.player_height;  // this is HALF the height in reality
+                    height = abs(head_projection.Y - center_projection.Y);
+                }
 
                 projections_of_predictions.push_back(projection);
                 aimbot_information.push_back({(prediction - game_data::my_player.location_).Magnitude(), projection, height});
@@ -1352,9 +1367,9 @@ void DrawInformationMenuNew(void) {
         ImGui::PushItemWidth(item_width);
         ImGui::Indent();
         const char* info0 =
-            "descension v1.1 (Public)\n"
-            "Released: 03/07/2022\n";
-            //"Game version: -";
+            "descension v1.2 (Public)\n"
+            "Released: 06/07/2022\n";
+        //"Game version: -";
 
         const char* info1 =
             "https://github.com/MuhanjalaRE\n"
@@ -1398,7 +1413,7 @@ void DrawAimAssistMenuNew(void) {
         if (ImGui::CollapsingHeader("Target settings")) {
             ImGui::Indent();
             ImGui::Checkbox("Friendly fire", &aimbot::aimbot_settings.friendly_fire);
-            //ImGui::Checkbox("Need line of sight", &aimbot::aimbot_settings.need_line_of_sight);
+            // ImGui::Checkbox("Need line of sight", &aimbot::aimbot_settings.need_line_of_sight);
             ImGui::Checkbox("Target everyone", &aimbot::aimbot_settings.target_everyone);
             if (!aimbot::aimbot_settings.target_everyone) {
                 ImGui::Checkbox("Stay locked on to target", &aimbot::aimbot_settings.stay_locked_to_target);
@@ -1447,36 +1462,39 @@ void DrawAimAssistMenuNew(void) {
             ImGui::Combo("Style##aim_assist_combo", (int*)&visuals::aimbot_visual_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels));
             ImGui::ColorEdit4("Colour", &visuals::aimbot_visual_settings.marker_colour.Value.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
 
-            ImGui::SliderInt("Radius", &visuals::aimbot_visual_settings.marker_size, 1, 10);
+            if (visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) {
+            } else {
+                ImGui::SliderInt("Radius", &visuals::aimbot_visual_settings.marker_size, 1, 10);
 
-            if (visuals::aimbot_visual_settings.marker_style == visuals::MarkerStyle::kCircle || visuals::aimbot_visual_settings.marker_style == visuals::MarkerStyle::kSquare) {
-                ImGui::SliderInt("Thickness", &visuals::aimbot_visual_settings.marker_thickness, 1, 10);
-            }
+                if (visuals::aimbot_visual_settings.marker_style == visuals::MarkerStyle::kCircle || visuals::aimbot_visual_settings.marker_style == visuals::MarkerStyle::kSquare) {
+                    ImGui::SliderInt("Thickness", &visuals::aimbot_visual_settings.marker_thickness, 1, 10);
+                }
 
-            ImGui::Text("Marker preview");
+                ImGui::Text("Marker preview");
 
-            ImVec2 window_position = ImGui::GetWindowPos();
-            ImVec2 window_size = ImGui::GetWindowSize();
+                ImVec2 window_position = ImGui::GetWindowPos();
+                ImVec2 window_size = ImGui::GetWindowSize();
 
-            ImDrawList* imgui_draw_list = ImGui::GetWindowDrawList();
-            ImVec2 current_cursor_pos = ImGui::GetCursorPos();
-            ImVec2 local_cursor_pos = {window_position.x + ImGui::GetCursorPosX(), window_position.y + ImGui::GetCursorPosY() - ImGui::GetScrollY()};
-            imgui_draw_list->AddRectFilled(local_cursor_pos, {local_cursor_pos.x + marker_preview_size, local_cursor_pos.y + marker_preview_size}, ImColor(0, 0, 0, 255), 0, 0);
-            ImVec2 center = {local_cursor_pos.x + marker_preview_size / 2, local_cursor_pos.y + marker_preview_size / 2};
+                ImDrawList* imgui_draw_list = ImGui::GetWindowDrawList();
+                ImVec2 current_cursor_pos = ImGui::GetCursorPos();
+                ImVec2 local_cursor_pos = {window_position.x + ImGui::GetCursorPosX(), window_position.y + ImGui::GetCursorPosY() - ImGui::GetScrollY()};
+                imgui_draw_list->AddRectFilled(local_cursor_pos, {local_cursor_pos.x + marker_preview_size, local_cursor_pos.y + marker_preview_size}, ImColor(0, 0, 0, 255), 0, 0);
+                ImVec2 center = {local_cursor_pos.x + marker_preview_size / 2, local_cursor_pos.y + marker_preview_size / 2};
 
-            float box_size_height = 40;
-            float box_size_width = box_size_height * esp::esp_settings.width_to_height_ratio;
+                float box_size_height = 40;
+                float box_size_width = box_size_height * esp::esp_settings.width_to_height_ratio;
 
-            imgui::visuals::DrawMarker((imgui::visuals::MarkerStyle)visuals::aimbot_visual_settings.marker_style, center, visuals::aimbot_visual_settings.marker_colour, visuals::aimbot_visual_settings.marker_size, visuals::aimbot_visual_settings.marker_thickness);
+                imgui::visuals::DrawMarker((imgui::visuals::MarkerStyle)visuals::aimbot_visual_settings.marker_style, center, visuals::aimbot_visual_settings.marker_colour, visuals::aimbot_visual_settings.marker_size, visuals::aimbot_visual_settings.marker_thickness);
 
-            current_cursor_pos.y += marker_preview_size;
-            ImGui::SetCursorPos(current_cursor_pos);
+                current_cursor_pos.y += marker_preview_size;
+                ImGui::SetCursorPos(current_cursor_pos);
 
-            ImGui::Spacing();
-            ImGui::Checkbox("Scale by distance", &visuals::aimbot_visual_settings.scale_by_distance);
-            if (visuals::aimbot_visual_settings.scale_by_distance) {
-                ImGui::SliderInt("Distance for scaling", &visuals::aimbot_visual_settings.distance_for_scaling, 1, 15000);
-                ImGui::SliderInt("Minimum marker size", &visuals::aimbot_visual_settings.minimum_marker_size, 1, 10);
+                ImGui::Spacing();
+                ImGui::Checkbox("Scale by distance", &visuals::aimbot_visual_settings.scale_by_distance);
+                if (visuals::aimbot_visual_settings.scale_by_distance) {
+                    ImGui::SliderInt("Distance for scaling", &visuals::aimbot_visual_settings.distance_for_scaling, 1, 15000);
+                    ImGui::SliderInt("Minimum marker size", &visuals::aimbot_visual_settings.minimum_marker_size, 1, 10);
+                }
             }
         }
         ImGui::EndTable();
@@ -1517,7 +1535,7 @@ void DrawRadarMenuNew(void) {
             ImGui::Indent();
             float marker_preview_size = 100;
 
-            ImGui::Combo("Style##radar_combo", (int*)&visuals::radar_visual_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels));
+            ImGui::Combo("Style##radar_combo", (int*)&visuals::radar_visual_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels)-2);
             ImGui::SliderInt("Radius", &visuals::radar_visual_settings.marker_size, 1, 50);
 
             if (visuals::radar_visual_settings.marker_style == visuals::MarkerStyle::kCircle || visuals::radar_visual_settings.marker_style == visuals::MarkerStyle::kSquare) {
@@ -1605,7 +1623,7 @@ void DrawOtherMenuNew(void) {
                 float marker_preview_size = 100;
                 ImGui::Indent();
                 ImGui::Checkbox("Enabled##crosshair_enabled", &visuals::crosshair_settings.enabled);
-                ImGui::Combo("Style##crosshair_combo", (int*)&visuals::crosshair_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels));
+                ImGui::Combo("Style##crosshair_combo", (int*)&visuals::crosshair_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels)-2);
                 ImGui::ColorEdit4("Colour", &visuals::crosshair_settings.marker_colour.Value.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
                 ImGui::SliderInt("Radius", &visuals::crosshair_settings.marker_size, 1, 10);
 
@@ -1699,11 +1717,11 @@ PROCESSEVENT_HOOK_FUNCTION(UEHookMain) {
         if (!got_resolution && game_data::local_player_controller && game_data::my_player.is_valid_) {
             int x, y;
             ImVec2 display_size = ImGui::GetIO().DisplaySize;
-            //cout << display_size.x << ", " << display_size.y << endl;
+            // cout << display_size.x << ", " << display_size.y << endl;
             x = display_size.x;
             y = display_size.y;
-            
-            //game_data::local_player_controller->GetViewportSize(&x, &y);
+
+            // game_data::local_player_controller->GetViewportSize(&x, &y);
             game_data::screen_size = {x * 1.0f, y * 1.0f};
             game_data::screen_center = {x * 0.5f, y * 0.5f};
             // got_resolution = true;
@@ -1719,10 +1737,10 @@ void UE4_(void) {
 void HookUnrealEngine4(void) {
     base_address = (DWORD64)GetModuleHandle(0);
 
-    //UObject::GObjects = reinterpret_cast<CG::TUObjectArray*>(base_address + 0x5283F20);
-    //FName::GNames = reinterpret_cast<CG::GNAME_TYPE*>(base_address + 0x5266340);
+    // UObject::GObjects = reinterpret_cast<CG::TUObjectArray*>(base_address + 0x5283F20);
+    // FName::GNames = reinterpret_cast<CG::GNAME_TYPE*>(base_address + 0x5266340);
 
-    //InitSdk();
+    // InitSdk();
 
     DWORD uworld_rip_offset_ = 0;
     LPCSTR uworld_signature = "\x74\x4E\x48\x8B\x1D\x00\x00\x00\x00\x48\x85\xDB\x74\x3B";
@@ -1741,8 +1759,8 @@ void HookUnrealEngine4(void) {
         module mod = SigScanner.GetModule("MidairCE-Win64-Test.exe");
         uworld_signature_address = SigScanner.FindSignature(mod.dwBase, mod.dwSize, uworld_signature, uworld_Mask);
         if (!uworld_signature_address) {
-            //cout << "Error finding UWorld signature" << endl;
-            //Sleep(1000000);
+            // cout << "Error finding UWorld signature" << endl;
+            // Sleep(1000000);
             *((DWORD64*)0x0) = 0x9999;
         }
 
@@ -1763,7 +1781,6 @@ void HookUnrealEngine4(void) {
 
     world_proxy.world = (CG::UWorld*)(*(DWORD64*)(base_address + uworld_offset));
 
-
     game_data::local_player = ((ULocalPlayer*)world_proxy.world->OwningGameInstance->LocalPlayers[0]);
     game_data::local_player_controller = (AMAPlayerController*)game_data::local_player->PlayerController;
 
@@ -1781,8 +1798,7 @@ void HookUnrealEngine4(void) {
     */
 
     game_data::screen_size = FVector2D(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
-    game_data::screen_center = FVector2D(ImGui::GetIO().DisplaySize.x/2, ImGui::GetIO().DisplaySize.y/2);
-
+    game_data::screen_center = FVector2D(ImGui::GetIO().DisplaySize.x / 2, ImGui::GetIO().DisplaySize.y / 2);
 }
 
 void DrawImGuiInUE4(void) {
@@ -1809,7 +1825,15 @@ void DrawImGuiInUE4(void) {
             float box_size_height = i->height;
             float box_size_width = box_size_height * esp::esp_settings.width_to_height_ratio;
 
-            imgui::visuals::DrawMarker((imgui::visuals::MarkerStyle)visuals::aimbot_visual_settings.marker_style, v, visuals::aimbot_visual_settings.marker_colour, marker_size, visuals::aimbot_visual_settings.marker_thickness);
+            if (visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds) {
+                ImDrawList* imgui_draw_list = ImGui::GetWindowDrawList();
+                imgui_draw_list->AddRect({v.x - box_size_width, v.y - box_size_height}, {v.x + box_size_width, v.y + box_size_height}, visuals::aimbot_visual_settings.marker_colour, 0, 0, visuals::aimbot_visual_settings.marker_thickness);
+            } else if (visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) {
+                ImDrawList* imgui_draw_list = ImGui::GetWindowDrawList();
+                imgui_draw_list->AddRectFilled({v.x - box_size_width, v.y - box_size_height}, {v.x + box_size_width, v.y + box_size_height}, visuals::aimbot_visual_settings.marker_colour, 0);
+            } else {
+                imgui::visuals::DrawMarker((imgui::visuals::MarkerStyle)visuals::aimbot_visual_settings.marker_style, v, visuals::aimbot_visual_settings.marker_colour, marker_size, visuals::aimbot_visual_settings.marker_thickness);
+            }
         }
 
         ImGui::End();
@@ -1827,6 +1851,9 @@ void DrawImGuiInUE4(void) {
 
         static ImColor colour = enemy_box_colour;
         for (vector<esp::ESPInformation>::iterator esp_information = esp::esp_information.begin(); esp_information != esp::esp_information.end(); esp_information++) {
+            if (esp_information->projection.X <= 0 && esp_information->projection.Y <= 0)
+                continue;
+
             colour = (esp_information->is_friendly) ? friendly_box_colour : enemy_box_colour;
             ImVec2 projection(esp_information->projection.X, esp_information->projection.Y);
             float box_size_height = esp_information->height;
@@ -1939,7 +1966,7 @@ void DrawImGuiInUE4(void) {
 
         static ImVec2 padding = ImGui::GetStyle().FramePadding;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding.x, 8));
-        ImGui::Begin("descension v1.1", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
+        ImGui::Begin("descension v1.2", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
         ImGui::PopStyleVar();
 
         ImVec2 window_position = ImGui::GetWindowPos();
@@ -2040,7 +2067,8 @@ void GetWeapon(void) {
         } else if (weapon->IsA(ABP_Blaster_C::StaticClass())) {
             my_player.weapon_ = Weapon::blaster;
             my_player.weapon_type_ = WeaponType::kProjectileLinear;
-        }*/ else {
+        }*/
+        else {
             my_player.weapon_ == Weapon::unknown;
             my_player.weapon_type_ = WeaponType::kHitscan;
         }
