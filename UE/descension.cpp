@@ -207,7 +207,7 @@ static struct AimbotVisualSettings : Marker {
     int distance_for_scaling = 5000;
     int minimum_marker_size = 3;
     AimbotVisualSettings(void) {
-        marker_style = MarkerStyle::kFilledBounds;
+        marker_style = MarkerStyle::kBounds;
         marker_size = 9;
         marker_thickness = 2;
         marker_colour = {255, 255, 0, 125};
@@ -457,6 +457,7 @@ struct GameActor {
     FVector location_;
     FRotator rotation_;
     FVector velocity_;
+    // FVector velocity_previous_;
     FVector forward_vector_;
     FVector acceleration_;
 
@@ -509,6 +510,7 @@ struct Player : public GameActor {
         location_ = character->RootComponent->RelativeLocation;
         rotation_ = character->RootComponent->RelativeRotation;
         velocity_ = character->RootComponent->ComponentVelocity;
+        //acceleration_ = character->CharacterMovement->Acceleration;
         forward_vector_ = math::RotatorToVector(rotation_).Unit();
 
         character_ = character;
@@ -555,6 +557,7 @@ static class GameData {
 
     void Reset(void) {
         players.clear();
+
         flags.clear();
         my_player_information.weapon_ = Weapon::none;
         my_player_information.weapon_type_ = WeaponType::kHitscan;
@@ -571,6 +574,8 @@ void GetPlayers(void) {
     bool my_player_character_found = false;
 
     AMAGameState* game_state = ((AMAGameState*)world_proxy.world->GameState);
+    if (game_state == NULL)
+        return;
 
     /*
     if (game_state->IsA(AMACTFGameState::StaticClass())) {
@@ -850,8 +855,12 @@ void Tick(void) {
 
 namespace aimbot {
 
+
 // Overshooting means the weapon bullet speed is too low
 // Undershooting means the weapon bullet speed is too high
+
+static float delta_time = 0;
+vector<game_data::information::Player> players_previous;
 
 enum AimbotMode { kClosestDistance, kClosestXhair };
 static const char* mode_labels[] = {"Closest distance", "Closest to crosshair"};
@@ -879,7 +888,10 @@ static struct AimbotSettings {
     bool friendly_fire = false;
     bool need_line_of_sight = false;
 
-    int aimbot_poll_frequency = 60 * 5;
+    int aimbot_poll_frequency = 60;// *5;
+
+    bool use_acceleration = true;
+    //float acceleration_delta_in_ms = 30;
 } aimbot_settings;
 
 static Timer aimbot_poll_timer(aimbot_settings.aimbot_poll_frequency);
@@ -900,6 +912,8 @@ static struct WeaponAimbotParameters {
     int maximum_iterations = 2 * 10;
     float epsilon = 0.05 / 3;
 } aimbot_parameters_;
+
+bool PredictAimAtTargetDL(game_data::information::Player* target_player, FVector* output_vector, FVector offset);
 
 bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* output_vector, FVector offset) {
     float projectileSpeed;
@@ -944,17 +958,48 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
         return true;
     }
 
+    /*
+    if (game_data::my_player.weapon_type_ == game_data::WeaponType::kProjectileArching) {
+        return PredictAimAtTargetDL(target_player, output_vector, offset);
+    }
+    */
+
     if (game_data::my_player.weapon_type_ != game_data::WeaponType::kProjectileArching && game_data::my_player.weapon_type_ != game_data::WeaponType::kProjectileLinear)
         return false;
 
-    FVector owner_location = game_data::my_player.location_ - offset;
+    FVector owner_location = game_data::my_player.location_ - offset * 0;
     FVector owner_velocity = game_data::my_player.velocity_;
 
     // owner_location = owner_location - owner_velocity * (weapon_parameters_.self_compensation_ping_ / 1000.0);
 
     FVector target_location = target_player->location_;
     FVector target_velocity = target_player->velocity_;
-    FVector target_acceleration = target_player->velocity_ * 0;
+
+    /*
+    a_ = (v-u)/t
+    acceleration is normalised -> a = a_ / |a_|
+    */
+    FVector target_acceleration = FVector();
+    if (aimbot::aimbot_settings.use_acceleration) {
+        FVector velocity_previous = FVector();
+        bool player_found = false;
+        for (vector<game_data::information::Player>::iterator player = players_previous.begin(); player != players_previous.end(); player++) {
+            if (player->character_ == target_player->character_) {
+                player_found = true;
+                velocity_previous = player->velocity_;
+                break;
+            }
+        }
+
+        if (player_found) {
+            target_acceleration = (target_velocity - velocity_previous) / (delta_time / 1000.0);  //(aimbot::aimbot_settings.acceleration_delta_in_ms/1000.0);
+
+            //cout << "Custom accecl: " << target_acceleration.X << ", " << target_acceleration.Y << ", " << target_acceleration.Z << endl;
+            //cout << "Real accecl: " << target_player->character_->CharacterMovement->Acceleration.X << ", " << target_player->character_->CharacterMovement->Acceleration.Y << ", " << target_player->character_->CharacterMovement->Acceleration.Z << endl << endl;
+          
+            //cout << delta_time << endl;
+        }
+    }
 
     // float ping_time = weapon_parameters_.ping_ / 1000.0;
 
@@ -987,9 +1032,45 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
     *output_vector = ping_prediction;
 
     return true;
+}
 
-    /*
-     */
+bool PredictAimAtTargetDL(game_data::information::Player* target_player, FVector* output_vector, FVector offset) {
+    float projectileSpeed;
+    float inheritence;
+    float ping;
+
+    switch (game_data::my_player.weapon_) {
+        using namespace game_data::information;
+        case game_data::Weapon::disk:
+            projectileSpeed = weapon_speeds.disk.bullet_speed;
+            inheritence = weapon_speeds.disk.inheritence;
+            ping = aimbot::aimbot_settings.tempest_ping_in_ms;
+            break;
+        case game_data::Weapon::cg:
+            projectileSpeed = weapon_speeds.chaingun.bullet_speed;
+            inheritence = weapon_speeds.chaingun.inheritence;
+            ping = aimbot::aimbot_settings.chaingun_ping_in_ms;
+            break;
+        case game_data::Weapon::gl:
+            projectileSpeed = weapon_speeds.grenadelauncher.bullet_speed;
+            inheritence = weapon_speeds.grenadelauncher.inheritence;
+            ping = aimbot::aimbot_settings.grenadelauncher_ping_in_ms;
+            break;
+        case game_data::Weapon::plasma:
+            projectileSpeed = weapon_speeds.plasma.bullet_speed;
+            inheritence = weapon_speeds.plasma.inheritence;
+            ping = aimbot::aimbot_settings.plasmagun_ping_in_ms;
+            break;
+        case game_data::Weapon::blaster:
+            projectileSpeed = weapon_speeds.blaster.bullet_speed;
+            inheritence = weapon_speeds.blaster.inheritence;
+            ping = aimbot::aimbot_settings.blaster_ping_in_ms;
+            break;
+        case game_data::Weapon::none:
+        case game_data::Weapon::unknown:
+        default:
+            return false;
+    }
 
     FVector muzzlePosition = game_data::my_player.location_ + offset;
     FVector targetPosition = target_player->location_ + (target_player->velocity_ * ping / 1000.0);
@@ -1188,6 +1269,11 @@ void Tick(void) {
     if (!aimbot_settings.enabled /*|| !enabled*/ || !aimbot_poll_timer.IsReady())
         return;
 
+    static std::chrono::steady_clock::time_point previous_tick = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    delta_time = std::chrono::duration<float>(now - previous_tick).count() * 1000.0;
+    previous_tick = now;
+
     projections_of_predictions.clear();
     aimbot_information.clear();
 
@@ -1215,6 +1301,8 @@ void Tick(void) {
 
                 projections_of_predictions.push_back(projection);
                 aimbot_information.push_back({(prediction - game_data::my_player.location_).Magnitude(), projection, height});
+
+                //cout << (int)target_player.character_->AccelInfo << endl;
             }
         }
     } else {
@@ -1233,6 +1321,9 @@ void Tick(void) {
             if (!game_functions::IsInHorizontalFieldOfView(player->location_, aimbot_settings.aimbot_horizontal_fov_angle))
                 continue;
 
+
+            //aimbot::aimbot_settings.use_acceleration = false;
+
             bool result = PredictAimAtTarget(&*p, &prediction, muzzle_offset);
 
             if (result) {
@@ -1250,8 +1341,33 @@ void Tick(void) {
                 projections_of_predictions.push_back(projection);
                 aimbot_information.push_back({(prediction - game_data::my_player.location_).Magnitude(), projection, height});
             }
+
+            /*
+            aimbot::aimbot_settings.use_acceleration = true;
+
+            result = PredictAimAtTarget(&*p, &prediction, muzzle_offset);
+
+            if (result) {
+                FVector2D projection = game_functions::Project(prediction);
+                float height = -1;
+
+                if ((imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) && height == -1) {
+                    FVector2D center_projection = game_functions::Project(player->location_);
+                    player->location_.Z += esp::esp_settings.player_height;  // this is HALF the height in reality
+                    FVector2D head_projection = game_functions::Project(player->location_);
+                    player->location_.Z -= esp::esp_settings.player_height;  // this is HALF the height in reality
+                    height = abs(head_projection.Y - center_projection.Y);
+                }
+
+                projections_of_predictions.push_back(projection);
+                aimbot_information.push_back({(prediction - game_data::my_player.location_).Magnitude(), projection, height});
+            }
+
+            */
         }
     }
+
+    players_previous = game_data::game_data.players;
 }
 
 }  // namespace aimbot
@@ -1367,8 +1483,8 @@ void DrawInformationMenuNew(void) {
         ImGui::PushItemWidth(item_width);
         ImGui::Indent();
         const char* info0 =
-            "descension v1.2 (Public)\n"
-            "Released: 06/07/2022\n";
+            "descension v1.3 (Public)\n"
+            "Released: 10/07/2022\n";
         //"Game version: -";
 
         const char* info1 =
@@ -1405,6 +1521,11 @@ void DrawAimAssistMenuNew(void) {
 
             if (ImGui::SliderInt("Poll rate (Hz)", &aimbot::aimbot_settings.aimbot_poll_frequency, 1, 300)) {
                 aimbot::aimbot_poll_timer.SetFrequency(aimbot::aimbot_settings.aimbot_poll_frequency);
+            }
+
+            ImGui::Checkbox("Factor target acceleration", &aimbot::aimbot_settings.use_acceleration);
+            if (aimbot::aimbot_settings.use_acceleration) {
+                //ImGui::SliderFloat("Acceleration delta (ms)", &aimbot::aimbot_settings.acceleration_delta_in_ms, 1, 1000);
             }
 
             ImGui::Unindent();
@@ -1463,6 +1584,9 @@ void DrawAimAssistMenuNew(void) {
             ImGui::ColorEdit4("Colour", &visuals::aimbot_visual_settings.marker_colour.Value.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
 
             if (visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) {
+                if (visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds) {
+                    ImGui::SliderInt("Thickness", &visuals::aimbot_visual_settings.marker_thickness, 1, 10);
+                }
             } else {
                 ImGui::SliderInt("Radius", &visuals::aimbot_visual_settings.marker_size, 1, 10);
 
@@ -1535,7 +1659,7 @@ void DrawRadarMenuNew(void) {
             ImGui::Indent();
             float marker_preview_size = 100;
 
-            ImGui::Combo("Style##radar_combo", (int*)&visuals::radar_visual_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels)-2);
+            ImGui::Combo("Style##radar_combo", (int*)&visuals::radar_visual_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels) - 2);
             ImGui::SliderInt("Radius", &visuals::radar_visual_settings.marker_size, 1, 50);
 
             if (visuals::radar_visual_settings.marker_style == visuals::MarkerStyle::kCircle || visuals::radar_visual_settings.marker_style == visuals::MarkerStyle::kSquare) {
@@ -1623,7 +1747,7 @@ void DrawOtherMenuNew(void) {
                 float marker_preview_size = 100;
                 ImGui::Indent();
                 ImGui::Checkbox("Enabled##crosshair_enabled", &visuals::crosshair_settings.enabled);
-                ImGui::Combo("Style##crosshair_combo", (int*)&visuals::crosshair_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels)-2);
+                ImGui::Combo("Style##crosshair_combo", (int*)&visuals::crosshair_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels) - 2);
                 ImGui::ColorEdit4("Colour", &visuals::crosshair_settings.marker_colour.Value.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
                 ImGui::SliderInt("Radius", &visuals::crosshair_settings.marker_size, 1, 10);
 
@@ -1960,7 +2084,7 @@ void DrawImGuiInUE4(void) {
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
 
-        ImGui::SetNextWindowPos({100, 100}, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos({300, 300}, ImGuiCond_FirstUseEver);
 
         ImGui::SetNextWindowSize({800, 500}, ImGuiCond_FirstUseEver);
 
