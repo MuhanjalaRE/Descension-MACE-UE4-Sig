@@ -3,9 +3,9 @@
 
 using namespace std;
 using namespace CG;
-static DWORD64 uworld_offset = 0;
+/* static */ DWORD64 uworld_offset = 0;
 // static const DWORD64 processevent_offset = 0xEE57C0;
-static DWORD64 base_address = NULL;
+/* static */ DWORD64 base_address = NULL;
 
 class UWorldProxy {
    public:
@@ -62,138 +62,11 @@ class Timer {
     }
 };
 
-// Literally just copypasta'd garbage from UE4 source for DLs aimbot
-namespace FMath {
-
-/*-----------------------------------------------------------------------------
-Floating point constants.
------------------------------------------------------------------------------*/
-
-#undef PI
-#define PI (3.1415926535897932f) /* Extra digits if needed: 3.1415926535897932384626433832795f */
-#define SMALL_NUMBER (1.e-8f)
-#define KINDA_SMALL_NUMBER (1.e-4f)
-#define BIG_NUMBER (3.4e+38f)
-#define EULERS_NUMBER (2.71828182845904523536f)
-#define UE_GOLDEN_RATIO (1.6180339887498948482045868343656381f) /* Also known as divine proportion, golden mean, or golden section - related to the Fibonacci Sequence = (1 + sqrt(5)) / 2 */
-
-// Copied from float.h
-#define MAX_FLT 3.402823466e+38F
-
-// Aux constants.
-#define INV_PI (0.31830988618f)
-#define HALF_PI (1.57079632679f)
-
-// Common square roots
-#define UE_SQRT_2 (1.4142135623730950488016887242097f)
-#define UE_SQRT_3 (1.7320508075688772935274463415059f)
-#define UE_INV_SQRT_2 (0.70710678118654752440084436210485f)
-#define UE_INV_SQRT_3 (0.57735026918962576450914878050196f)
-#define UE_HALF_SQRT_2 (0.70710678118654752440084436210485f)
-#define UE_HALF_SQRT_3 (0.86602540378443864676372317075294f)
-
-// Magic numbers for numerical precision.
-#define DELTA (0.00001f)
-
-/**
- * Lengths of normalized vectors (These are half their maximum values
- * to assure that dot products with normalized vectors don't overflow).
- */
-#define FLOAT_NORMAL_THRESH (0.0001f)
-
-//
-// Magic numbers for numerical precision.
-//
-#define THRESH_POINT_ON_PLANE (0.10f) /* Thickness of plane for front/back/inside test */
-#define THRESH_POINT_ON_SIDE (0.20f) /* Thickness of polygon side's side-plane for point-inside/outside/on side test */
-#define THRESH_POINTS_ARE_SAME (0.00002f) /* Two points are same if within this distance */
-#define THRESH_POINTS_ARE_NEAR (0.015f) /* Two points are near if within this distance and can be combined if imprecise math is ok */
-#define THRESH_NORMALS_ARE_SAME (0.00002f) /* Two normal points are same if within this distance */
-#define THRESH_UVS_ARE_SAME (0.0009765625f) /* Two UV are same if within this threshold (1.0f/1024f) */
-/* Making this too large results in incorrect CSG classification and disaster */
-#define THRESH_VECTORS_ARE_NEAR (0.0004f) /* Two vectors are near if within this distance and can be combined if imprecise math is ok */
-/* Making this too large results in lighting problems due to inaccurate texture coordinates */
-#define THRESH_SPLIT_POLY_WITH_PLANE (0.25f) /* A plane splits a polygon in half */
-#define THRESH_SPLIT_POLY_PRECISELY (0.01f) /* A plane exactly splits a polygon */
-#define THRESH_ZERO_NORM_SQUARED (0.0001f) /* Size of a unit normal that is considered "zero", squared */
-#define THRESH_NORMALS_ARE_PARALLEL (0.999845f) /* Two unit vectors are parallel if abs(A dot B) is greater than or equal to this. This is roughly cosine(1.0 degrees). */
-#define THRESH_NORMALS_ARE_ORTHOGONAL (0.017455f) /* Two unit vectors are orthogonal (perpendicular) if abs(A dot B) is less than or equal this. This is roughly cosine(89.0 degrees). */
-
-#define THRESH_VECTOR_NORMALIZED (0.01f) /** Allowed error for a normalized vector (against squared magnitude) */
-#define THRESH_QUAT_NORMALIZED (0.01f) /** Allowed error for a normalized quaternion (against squared magnitude) */
-
-typedef signed int int32;
-#define CONSTEXPR constexpr
-
-static FORCEINLINE float Sqrt(float Value) {
-    return sqrtf(Value);
-}
-
-/** Computes absolute value in a generic way */
-template <class T>
-static CONSTEXPR FORCEINLINE T Abs(const T A) {
-    return (A >= (T)0) ? A : -A;
-}
-
-/**
- *	Checks if two floating point numbers are nearly equal.
- *	@param A				First number to compare
- *	@param B				Second number to compare
- *	@param ErrorTolerance	Maximum allowed difference for considering them as 'nearly equal'
- *	@return					true if A and B are nearly equal
- */
-static FORCEINLINE bool IsNearlyEqual(float A, float B, float ErrorTolerance = SMALL_NUMBER) {
-    return Abs<float>(A - B) <= ErrorTolerance;
-}
-
-static CONSTEXPR FORCEINLINE int32 TruncToInt(float F) {
-    return (int32)F;
-}
-/** Returns higher value in a generic way */
-template <class T>
-static CONSTEXPR FORCEINLINE T Max(const T A, const T B) {
-    return (A >= B) ? A : B;
-}
-
-/** Returns lower value in a generic way */
-template <class T>
-static CONSTEXPR FORCEINLINE T Min(const T A, const T B) {
-    return (A <= B) ? A : B;
-}
-
-static FORCEINLINE int32 Rand() {
-    return rand();
-}
-
-/** Seeds global random number functions Rand() and FRand() */
-static FORCEINLINE void RandInit(int32 Seed) {
-    srand(Seed);
-}
-
-static FORCEINLINE float FRand() {
-    return Rand() / (float)RAND_MAX;
-}
-
-/** Helper function for rand implementations. Returns a random number in [0..A) */
-static FORCEINLINE int32 RandHelper(int32 A) {
-    // Note that on some platforms RAND_MAX is a large number so we cannot do ((rand()/(RAND_MAX+1)) * A)
-    // or else we may include the upper bound results, which should be excluded.
-    return A > 0 ? Min(TruncToInt(FRand() * A), A - 1) : 0;
-}
-
-/** Helper function for rand implementations. Returns a random number >= Min and <= Max */
-static FORCEINLINE int32 RandRange(int32 Min, int32 Max) {
-    const int Range = (Max - Min) + 1;
-    return Min + RandHelper(Range);
-}
-
-}  // namespace FMath
-
 namespace imgui {
 
 namespace visuals {
-static enum MarkerStyle { kNone, kDot, kCircle, kFilledSquare, kSquare, kBounds, kFilledBounds };
-static const char* marker_labels[] = {"None", "Dot", "Circle", "Filled square", "Square", "Bounds", "Filled bounds"};
+/* static */ enum MarkerStyle { kNone, kDot, kCircle, kFilledSquare, kSquare, kBounds, kFilledBounds };
+/* static */ const char* marker_labels[] = {"None", "Dot", "Circle", "Filled square", "Square", "Bounds", "Filled bounds"};
 
 struct Marker {
     MarkerStyle marker_style = MarkerStyle::kSquare;
@@ -202,7 +75,7 @@ struct Marker {
     ImColor marker_colour = {255, 255, 255, 255};
 };
 
-static struct AimbotVisualSettings : Marker {
+/* static */ struct AimbotVisualSettings : Marker {
     bool scale_by_distance = true;
     int distance_for_scaling = 5000;
     int minimum_marker_size = 3;
@@ -214,7 +87,7 @@ static struct AimbotVisualSettings : Marker {
     }
 } aimbot_visual_settings;
 
-static struct RadarVisualSettings : Marker {
+/* static */ struct RadarVisualSettings : Marker {
     ImColor enemy_marker_colour = {255, 0, 0, 1 * 255};
     ImColor friendly_marker_colour = {0, 255, 0, 1 * 255};
     ImColor enemy_flag_marker_colour = {255, 255, 0, 255};
@@ -235,7 +108,7 @@ static struct RadarVisualSettings : Marker {
     }
 } radar_visual_settings;
 
-static struct ESPVisualSettings {
+/* static */ struct ESPVisualSettings {
     struct BoundingBoxSettings {
         int box_thickness = 2;
         ImColor enemy_player_box_colour = {0, 255, 255, 1 * 125};
@@ -248,7 +121,7 @@ static struct ESPVisualSettings {
     } line_settings;
 } esp_visual_settings;
 
-static struct CrosshairSettings : Marker {
+/* static */ struct CrosshairSettings : Marker {
     bool enabled = true;
 
     CrosshairSettings(void) {
@@ -282,7 +155,7 @@ void DrawMarker(MarkerStyle marker_style, ImVec2 center, ImColor marker_colour, 
 }  // namespace visuals
 namespace imgui_menu {}
 
-static struct ImGuiSettings { } imgui_settings; }  // namespace imgui
+/* static */ struct ImGuiSettings { } imgui_settings; }  // namespace imgui
 
 namespace hooks {
 namespace processevent {
@@ -397,19 +270,19 @@ float AngleBetweenVector(FVector a, FVector b) {
 }  // namespace math
 
 namespace game_data {
-static ULocalPlayer* local_player = NULL;
-static AMAPlayerController* local_player_controller = NULL;
-static AMACharacter* local_player_character = NULL;
+/* static */ ULocalPlayer* local_player = NULL;
+/* static */ AMAPlayerController* local_player_controller = NULL;
+/* static */ AMACharacter* local_player_character = NULL;
 
-static FVector2D screen_size = FVector2D();
-static FVector2D screen_center = FVector2D();
+/* static */ FVector2D screen_size = FVector2D();
+/* static */ FVector2D screen_center = FVector2D();
 
 enum class Weapon { none, disk, cg, gl, blaster, plasma, unknown };
 enum class WeaponType { kHitscan, kProjectileLinear, kProjectileArching };
 
 namespace information {
 
-static struct WeaponSpeeds {
+/* static */ struct WeaponSpeeds {
     struct Weapon {
         float bullet_speed;
         float inheritence;
@@ -544,7 +417,7 @@ class Flag : public GameActor {
 
 }  // namespace information
 
-static class GameData {
+/* static */ class GameData {
    public:
     information::Player my_player_information;
     vector<information::Player> players;
@@ -565,9 +438,10 @@ static class GameData {
     }
 
 } game_data;
-static game_data::information::Player& my_player = game_data::game_data.my_player_information;
 
-static Timer get_player_controllers_timer(0.1 * 5);
+/* static */ game_data::information::Player& my_player = game_data::game_data.my_player_information;
+
+/* static */ Timer get_player_controllers_timer(0.1 * 5);
 
 void GetPlayers(void) {
     local_player_character = (AMACharacter*)local_player_controller->Character;
@@ -589,7 +463,7 @@ void GetPlayers(void) {
     }
     */
 
-    static information::Player player_information;
+    /* static */ information::Player player_information;
 
     TArray<APlayerState*>& player_states = game_state->PlayerArray;
     for (int i = 0; i < player_states.Num(); i++) {
@@ -789,7 +663,7 @@ FVector GetMuzzleOffset(void) {
 
 namespace other {
 
-static struct OtherSettings { bool disable_hitmarker = false; } other_settings;
+/* static */ struct OtherSettings { bool disable_hitmarker = false; } other_settings;
 
 void SendLeftMouseClick(void) {
     INPUT inputs[2];
@@ -821,7 +695,7 @@ void Tick(void) {
 
 namespace esp {
 
-static struct ESPSettings {
+/* static */ struct ESPSettings {
     bool enabled = true;
     int poll_frequency = 60 * 5;
     bool show_friendlies = false;
@@ -831,7 +705,7 @@ static struct ESPSettings {
     bool show_lines = true;
 } esp_settings;
 
-static Timer get_esp_data_timer(esp_settings.poll_frequency);
+/* static */ Timer get_esp_data_timer(esp_settings.poll_frequency);
 
 struct ESPInformation {
     FVector2D projection;  // center
@@ -883,14 +757,14 @@ namespace aimbot {
 // Overshooting means the weapon bullet speed is too low
 // Undershooting means the weapon bullet speed is too high
 
-static float delta_time = 0;
+/* static */ float delta_time = 0;
 vector<game_data::information::Player> players_previous;
 
 enum AimbotMode { kClosestDistance, kClosestXhair };
-static const char* mode_labels[] = {"Closest distance", "Closest to crosshair"};
-static bool enabled = true;
+/* static */ const char* mode_labels[] = {"Closest distance", "Closest to crosshair"};
+/* static */ bool enabled = true;
 
-static struct AimbotSettings {
+/* static */ struct AimbotSettings {
     AimbotMode aimbot_mode = AimbotMode::kClosestXhair;
 
     bool enabled = true;          // enabling really just enables aimassist, this isnt really an aimbot
@@ -912,7 +786,7 @@ static struct AimbotSettings {
     bool friendly_fire = false;
     bool need_line_of_sight = false;
 
-    int aimbot_poll_frequency = 60*5;
+    int aimbot_poll_frequency = 60;  //*5;
 
     bool use_acceleration = true;
     // float acceleration_delta_in_ms = 30;
@@ -920,9 +794,9 @@ static struct AimbotSettings {
     bool triggerbot_enabled = true;
 } aimbot_settings;
 
-static Timer aimbot_poll_timer(aimbot_settings.aimbot_poll_frequency);
+/* static */ Timer aimbot_poll_timer(aimbot_settings.aimbot_poll_frequency);
 
-static game_data::information::Player target_player;
+/* static */ game_data::information::Player target_player;
 
 vector<FVector2D> projections_of_predictions;
 
@@ -934,12 +808,10 @@ struct AimbotInformation {
 
 vector<AimbotInformation> aimbot_information;
 
-static struct WeaponAimbotParameters {
+/* static */ struct WeaponAimbotParameters {
     int maximum_iterations = 2 * 10;
     float epsilon = 0.05 / 3;
 } aimbot_parameters_;
-
-bool PredictAimAtTargetDL(game_data::information::Player* target_player, FVector* output_vector, FVector offset);
 
 bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* output_vector, FVector offset) {
     float projectileSpeed;
@@ -1020,10 +892,10 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
         if (player_found) {
             target_acceleration = (target_velocity - velocity_previous) / (delta_time / 1000.0);  //(aimbot::aimbot_settings.acceleration_delta_in_ms/1000.0);
 
-            //target_acceleration = target_player->character_->CharacterMovement->Acceleration.Unit() * target_acceleration.Magnitude();
+            // target_acceleration = target_player->character_->CharacterMovement->Acceleration.Unit() * target_acceleration.Magnitude();
 
-            //cout << "Custom accecl: " << target_acceleration.X << ", " << target_acceleration.Y << ", " << target_acceleration.Z << endl;
-            //cout << "Real accecl: " << target_player->character_->CharacterMovement->Acceleration.X << ", " << target_player->character_->CharacterMovement->Acceleration.Y << ", " << target_player->character_->CharacterMovement->Acceleration.Z << endl << endl;
+            // cout << "Custom accecl: " << target_acceleration.X << ", " << target_acceleration.Y << ", " << target_acceleration.Z << endl;
+            // cout << "Real accecl: " << target_player->character_->CharacterMovement->Acceleration.X << ", " << target_player->character_->CharacterMovement->Acceleration.Y << ", " << target_player->character_->CharacterMovement->Acceleration.Z << endl << endl;
 
             // cout << delta_time << endl;
         }
@@ -1034,8 +906,8 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
     FVector prediction = target_location;
     FVector ping_prediction = target_location;
 
-    static vector<double> D(aimbot_parameters_.maximum_iterations, 0);
-    static vector<double> dt(aimbot_parameters_.maximum_iterations, 0);
+    /* static */ vector<double> D(aimbot_parameters_.maximum_iterations, 0);
+    /* static */ vector<double> dt(aimbot_parameters_.maximum_iterations, 0);
 
     int i = 0;
     do {
@@ -1058,135 +930,6 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
     ping_prediction = prediction = (target_location + (target_velocity * full_time * 1) + (target_acceleration * pow(dt[i], 2) * 0.5) - (1 ? (owner_velocity * (inheritence * full_time)) : FVector()));
 
     *output_vector = ping_prediction;
-
-    return true;
-}
-
-bool PredictAimAtTargetDL(game_data::information::Player* target_player, FVector* output_vector, FVector offset) {
-    float projectileSpeed;
-    float inheritence;
-    float ping;
-
-    switch (game_data::my_player.weapon_) {
-        using namespace game_data::information;
-        case game_data::Weapon::disk:
-            projectileSpeed = weapon_speeds.disk.bullet_speed;
-            inheritence = weapon_speeds.disk.inheritence;
-            ping = aimbot::aimbot_settings.tempest_ping_in_ms;
-            break;
-        case game_data::Weapon::cg:
-            projectileSpeed = weapon_speeds.chaingun.bullet_speed;
-            inheritence = weapon_speeds.chaingun.inheritence;
-            ping = aimbot::aimbot_settings.chaingun_ping_in_ms;
-            break;
-        case game_data::Weapon::gl:
-            projectileSpeed = weapon_speeds.grenadelauncher.bullet_speed;
-            inheritence = weapon_speeds.grenadelauncher.inheritence;
-            ping = aimbot::aimbot_settings.grenadelauncher_ping_in_ms;
-            break;
-        case game_data::Weapon::plasma:
-            projectileSpeed = weapon_speeds.plasma.bullet_speed;
-            inheritence = weapon_speeds.plasma.inheritence;
-            ping = aimbot::aimbot_settings.plasmagun_ping_in_ms;
-            break;
-        case game_data::Weapon::blaster:
-            projectileSpeed = weapon_speeds.blaster.bullet_speed;
-            inheritence = weapon_speeds.blaster.inheritence;
-            ping = aimbot::aimbot_settings.blaster_ping_in_ms;
-            break;
-        case game_data::Weapon::none:
-        case game_data::Weapon::unknown:
-        default:
-            return false;
-    }
-
-    FVector muzzlePosition = game_data::my_player.location_ + offset;
-    FVector targetPosition = target_player->location_ + (target_player->velocity_ * ping / 1000.0);
-    FVector targetVelocity = target_player->velocity_;
-
-    // Copy pasted from this point
-    float projectileSpeedSq = projectileSpeed * projectileSpeed;
-    float targetSpeedSq = targetVelocity.Magnitude() * targetVelocity.Magnitude();  // doing this instead of self-multiply for maximum accuracy
-    float targetSpeed = targetVelocity.Magnitude();
-    FVector targetToMuzzle = muzzlePosition - targetPosition;
-    float targetToMuzzleDistSq = targetToMuzzle.Magnitude() * targetToMuzzle.Magnitude();  // doing this instead of self-multiply for maximum accuracy
-    float targetToMuzzleDist = targetToMuzzle.Magnitude();
-    FVector targetToMuzzleDir = targetToMuzzle;
-    targetToMuzzleDir = targetToMuzzleDir.Unit();
-
-    // Law of Cosines: A*A + B*B - 2*A*B*cos(theta) = C*C
-    // A is distance from muzzle to target (known value: targetToMuzzleDist)
-    // B is distance traveled by target until impact (targetSpeed * t)
-    // C is distance traveled by projectile until impact (projectileSpeed * t)
-    float cosTheta = (targetSpeedSq > 0) ? targetToMuzzleDir.Dot(targetVelocity.Unit()) : 1.0f;
-
-    bool validSolutionFound = true;
-    float t;
-    if (FMath::IsNearlyEqual(projectileSpeedSq, targetSpeedSq)) {
-        // a = projectileSpeedSq - targetSpeedSq = 0
-        // We want to avoid div/0 that can result from target and projectile traveling at the same speed
-        // We know that C and B are the same length because the target and projectile will travel the same distance to impact
-        // Law of Cosines: A*A + B*B - 2*A*B*cos(theta) = C*C
-        // Law of Cosines: A*A + B*B - 2*A*B*cos(theta) = B*B
-        // Law of Cosines: A*A - 2*A*B*cos(theta) = 0
-        // Law of Cosines: A*A = 2*A*B*cos(theta)
-        // Law of Cosines: A = 2*B*cos(theta)
-        // Law of Cosines: A/(2*cos(theta)) = B
-        // Law of Cosines: 0.5f*A/cos(theta) = B
-        // Law of Cosines: 0.5f * targetToMuzzleDist / cos(theta) = targetSpeed * t
-        // We know that cos(theta) of zero or less means there is no solution, since that would mean B goes backwards or leads to div/0 (infinity)
-        if (cosTheta > 0) {
-            t = 0.5f * targetToMuzzleDist / (targetSpeed * cosTheta);
-        } else {
-            validSolutionFound = false;
-            t = FMath::RandRange(1, 5);
-        }
-    } else {
-        // Quadratic formula: Note that lower case 'a' is a completely different derived variable from capital 'A' used in Law of Cosines (sorry):
-        // t = [ -b +- Sqrt( b*b - 4*a*c ) ] / (2*a)
-        float a = projectileSpeedSq - targetSpeedSq;
-        float b = 2.0f * targetToMuzzleDist * targetSpeed * cosTheta;
-        float c = -targetToMuzzleDistSq;
-        float discriminant = b * b - 4.0f * a * c;
-
-        if (discriminant < 0) {
-            // Square root of a negative number is an imaginary number (NaN)
-            // Special thanks to Rupert Key (Twitter: @Arakade) for exposing NaN values that occur when target speed is faster than or equal to projectile speed
-            validSolutionFound = false;
-            t = FMath::RandRange(1, 5);
-        } else {
-            // a will never be zero because we protect against that with "if (Mathf.Approximately(projectileSpeedSq, targetSpeedSq))" above
-            float uglyNumber = FMath::Sqrt(discriminant);
-            float t0 = 0.5f * (-b + uglyNumber) / a;
-            float t1 = 0.5f * (-b - uglyNumber) / a;
-            // Assign the lowest positive time to t to aim at the earliest hit
-            t = FMath::Min(t0, t1);
-            if (t < SMALL_NUMBER) {
-                t = FMath::Max(t0, t1);
-            }
-
-            if (t < SMALL_NUMBER) {
-                // Time can't flow backwards when it comes to aiming.
-                // No real solution was found, take a wild shot at the target's future location
-                validSolutionFound = false;
-                t = FMath::RandRange(1, 5);
-            }
-        }
-    }
-
-    // Vb = Vt - 0.5*Ab*t + [(Pti - Pbi) / t]
-    FVector projectileVelocity = targetVelocity + (targetToMuzzle * -1 / t);
-    if (!validSolutionFound) {
-        // PredictiveAimWildGuessAtImpactTime gives you a t that will not result in impact
-        // Which means that all that math that assumes projectileSpeed is enough to impact at time t breaks down
-        // In this case, we simply want the direction to shoot to make sure we
-        // don't break the gameplay rules of the cannon's capabilities aside from gravity compensation
-        projectileVelocity = projectileVelocity.Unit() * projectileSpeed;
-        return false;
-    }
-
-    // The output vector is a vector that is pointing in the direction to aim, the output vector is not the actual predicted location
-    *output_vector = (muzzlePosition + projectileVelocity.Unit() * t * projectileSpeed) - (game_data::my_player.velocity_ * inheritence * t);
 
     return true;
 }
@@ -1293,11 +1036,13 @@ bool FindTarget(void) {
     return current_target_character != NULL;
 }
 
+/* static */ std::chrono::steady_clock::time_point previous_tick = std::chrono::steady_clock::now();
+
 void Tick(void) {
     if (!aimbot_settings.enabled /*|| !enabled*/ || !aimbot_poll_timer.IsReady())
         return;
 
-    static std::chrono::steady_clock::time_point previous_tick = std::chrono::steady_clock::now();
+    //static std::chrono::steady_clock::time_point previous_tick = std::chrono::steady_clock::now();
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     delta_time = std::chrono::duration<float>(now - previous_tick).count() * 1000.0;
     previous_tick = now;
@@ -1308,7 +1053,7 @@ void Tick(void) {
     if (!game_data::my_player.is_valid_ || game_data::my_player.weapon_ == game_data::Weapon::none || game_data::my_player.weapon_ == game_data::Weapon::unknown)
         return;
 
-    static FVector prediction;
+    /* static */ FVector prediction;
     FVector muzzle_offset = game_data::my_player.character_->Weapon->FireOffset;  // game_functions::GetMuzzleOffset();
 
     if (!aimbot_settings.target_everyone) {
@@ -1418,14 +1163,14 @@ void Tick(void) {
 }  // namespace aimbot
 
 namespace radar {
-static struct RadarSettings {
+/* static */ struct RadarSettings {
     bool enabled = true;
     int radar_poll_frequency = 60 * 5;
     bool show_friendlies = false;
     bool show_flags = true;
 } radar_settings;
 
-static Timer get_radar_data_timer(radar_settings.radar_poll_frequency);
+/* static */ Timer get_radar_data_timer(radar_settings.radar_poll_frequency);
 
 struct RadarLocation {  // polar coordinates
     float r = 0;
@@ -1445,8 +1190,8 @@ struct RadarInformation : RadarLocation {
     bool is_friendly = false;
 };
 
-static vector<RadarInformation> player_locations;
-static vector<RadarInformation> flag_locations;
+/* static */ vector<RadarInformation> player_locations;
+/* static */ vector<RadarInformation> flag_locations;
 
 void Tick(void) {
     if (!radar_settings.enabled || !get_radar_data_timer.IsReady())
@@ -1513,10 +1258,10 @@ void Tick(void) {
 namespace imgui {
 namespace imgui_menu {
 enum LeftMenuButtons { kAimAssist, kESP, kRadar, kOther, kAimTracker, kInformation };
-static const char* button_text[] = {"Aim assist", "ESP", "Radar", "Other", "-", "Information"};
-static const int buttons_num = sizeof(button_text) / sizeof(char*);
-static int selected_index = LeftMenuButtons::kInformation;  // LeftMenuButtons::kAimAssist;
-static float item_width = -150;
+/* static */ const char* button_text[] = {"Aim assist", "ESP", "Radar", "Other", "-", "Information"};
+/* static */ const int buttons_num = sizeof(button_text) / sizeof(char*);
+/* static */ int selected_index = LeftMenuButtons::kInformation;  // LeftMenuButtons::kAimAssist;
+/* static */ float item_width = -150;
 
 void DrawInformationMenuNew(void) {
     static ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable | (ImGuiTableFlags_ContextMenuInBody & 0) | (ImGuiTableFlags_NoBordersInBody & 0) | ImGuiTableFlags_BordersOuter;
@@ -1528,8 +1273,8 @@ void DrawInformationMenuNew(void) {
         ImGui::PushItemWidth(item_width);
         ImGui::Indent();
         const char* info0 =
-            "descension v1.3 (Public)\n"
-            "Released: 10/07/2022\n";
+            "descension v1.4 (Public)\n"
+            "Released: 11/07/2022\n";
         //"Game version: -";
 
         const char* info1 =
@@ -1940,7 +1685,7 @@ void HookUnrealEngine4(void) {
     DWORD64 processevent_address = 0;
     */
 
-    static SignatureScanner SigScanner;
+    /* static */ SignatureScanner SigScanner;
     if (SigScanner.GetProcess("MidairCE-Win64-Test.exe")) {
         module mod = SigScanner.GetModule("MidairCE-Win64-Test.exe");
         uworld_signature_address = SigScanner.FindSignature(mod.dwBase, mod.dwSize, uworld_signature, uworld_Mask);
@@ -2035,7 +1780,7 @@ void DrawImGuiInUE4(void) {
         ImColor enemy_box_colour = visuals::esp_visual_settings.bounding_box_settings.enemy_player_box_colour;
         int box_thickness = visuals::esp_visual_settings.bounding_box_settings.box_thickness;
 
-        static ImColor colour = enemy_box_colour;
+        /* static */ ImColor colour = enemy_box_colour;
         for (vector<esp::ESPInformation>::iterator esp_information = esp::esp_information.begin(); esp_information != esp::esp_information.end(); esp_information++) {
             if (esp_information->projection.X <= 0 && esp_information->projection.Y <= 0)
                 continue;
@@ -2056,7 +1801,7 @@ void DrawImGuiInUE4(void) {
     }
 
     if (visuals::crosshair_settings.enabled) {
-        static ImVec2 window_size(30, 30);
+        /* static */ ImVec2 window_size(30, 30);
 
         ImVec2 display_size = ImGui::GetIO().DisplaySize;
 
@@ -2080,12 +1825,12 @@ void DrawImGuiInUE4(void) {
             ImGui::Begin("Radar##radar", NULL, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse /*| ImGuiWindowFlags_NoBringToFrontOnFocus*/);
         }
 
-        visuals::radar_visual_settings.window_size = FMath::Max(ImGui::GetWindowSize().x, ImGui::GetWindowSize().y);
-        float border = visuals::radar_visual_settings.border;
-
         ImVec2 window_position = ImGui::GetWindowPos();
         ImVec2 window_size = ImGui::GetWindowSize();
         ImVec2 center(window_position.x + window_size.x / 2, window_position.y + window_size.y / 2);
+
+        visuals::radar_visual_settings.window_size = (window_size.x >= window_size.y) ? window_size.x : window_size.y;
+        float border = visuals::radar_visual_settings.border;
 
         visuals::radar_visual_settings.window_location = window_position;
         int axes_thickness = visuals::radar_visual_settings.axes_thickness;
@@ -2102,7 +1847,7 @@ void DrawImGuiInUE4(void) {
 
         ImColor friendly_marker_colour = visuals::radar_visual_settings.friendly_marker_colour;
         ImColor enemy_marker_colour = visuals::radar_visual_settings.enemy_marker_colour;
-        static ImColor player_marker_colour = enemy_marker_colour;
+        /* static */ ImColor player_marker_colour = enemy_marker_colour;
         for (vector<radar::RadarInformation>::iterator radar_information = radar::player_locations.begin(); radar_information != radar::player_locations.end(); radar_information++) {
             float theta = radar_information->theta;
             float y = radar_information->r * cos(theta) * visuals::radar_visual_settings.zoom_ * visuals::radar_visual_settings.zoom;
@@ -2141,7 +1886,7 @@ void DrawImGuiInUE4(void) {
     }
 
     if (dx11::imgui_show_menu) {
-        static bool unused_boolean = true;
+        //static bool unused_boolean = true;
 
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
@@ -2150,7 +1895,7 @@ void DrawImGuiInUE4(void) {
 
         ImGui::SetNextWindowSize({800, 500}, ImGuiCond_FirstUseEver);
 
-        static ImVec2 padding = ImGui::GetStyle().FramePadding;
+        /* static */ ImVec2 padding = ImGui::GetStyle().FramePadding;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding.x, 8));
         ImGui::Begin("descension v1.2", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
         ImGui::PopStyleVar();
@@ -2161,8 +1906,8 @@ void DrawImGuiInUE4(void) {
 
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_HorizontalScrollbar & 0;
 
-        static float left_menu_width = 125;
-        static float child_height_offset = 10;
+        /* static */ float left_menu_width = 125;
+        /* static */ float child_height_offset = 10;
 
         ImGui::PushStyleColor(ImGuiCol_::ImGuiCol_ChildBg, ImColor(0, 0, 0, 0).Value);
         ImGui::BeginChild("MenuL", ImVec2(left_menu_width, ImGui::GetContentRegionAvail().y - child_height_offset), false, window_flags);
