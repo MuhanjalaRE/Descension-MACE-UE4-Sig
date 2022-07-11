@@ -207,7 +207,7 @@ static struct AimbotVisualSettings : Marker {
     int distance_for_scaling = 5000;
     int minimum_marker_size = 3;
     AimbotVisualSettings(void) {
-        marker_style = MarkerStyle::kBounds;
+        marker_style = MarkerStyle::kFilledBounds;
         marker_size = 9;
         marker_thickness = 2;
         marker_colour = {255, 255, 0, 125};
@@ -510,7 +510,7 @@ struct Player : public GameActor {
         location_ = character->RootComponent->RelativeLocation;
         rotation_ = character->RootComponent->RelativeRotation;
         velocity_ = character->RootComponent->ComponentVelocity;
-        //acceleration_ = character->CharacterMovement->Acceleration;
+        // acceleration_ = character->CharacterMovement->Acceleration;
         forward_vector_ = math::RotatorToVector(rotation_).Unit();
 
         character_ = character;
@@ -788,10 +788,35 @@ FVector GetMuzzleOffset(void) {
 }  // namespace game_functions
 
 namespace other {
-static struct OtherSettings {
-} other_settings;
 
-void Tick(void) {}
+static struct OtherSettings { bool disable_hitmarker = false; } other_settings;
+
+void SendLeftMouseClick(void) {
+    INPUT inputs[2];
+    ZeroMemory(inputs, sizeof(inputs));
+
+    inputs[0].type = INPUT_MOUSE;
+    inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+
+    inputs[1].type = INPUT_MOUSE;
+    inputs[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+
+    UINT uSent = SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT));
+}
+
+void Tick(void) {
+    if (other::other_settings.disable_hitmarker) {
+        AMAHUD* ama_hud = (AMAHUD*)game_data::local_player_controller->MyHUD;
+        if (ama_hud) {
+            ama_hud->LastHitMarkerInfo.Time = 1.5;
+            ama_hud->LastHitMarkerInfo.bCriticalHit = true;
+            ama_hud->LastHitMarkerInfo.bTeamHit = true;
+            ama_hud->LastHitMarkerInfo.Damage = 0;
+            // ama_hud->LastHitMarkerInfo.MaterialInstance = NULL;
+            // ama_hud->HitMarkerMaterial = NULL;
+        }
+    }
+}
 }  // namespace other
 
 namespace esp {
@@ -855,7 +880,6 @@ void Tick(void) {
 
 namespace aimbot {
 
-
 // Overshooting means the weapon bullet speed is too low
 // Undershooting means the weapon bullet speed is too high
 
@@ -888,10 +912,12 @@ static struct AimbotSettings {
     bool friendly_fire = false;
     bool need_line_of_sight = false;
 
-    int aimbot_poll_frequency = 60;// *5;
+    int aimbot_poll_frequency = 60*5;
 
     bool use_acceleration = true;
-    //float acceleration_delta_in_ms = 30;
+    // float acceleration_delta_in_ms = 30;
+
+    bool triggerbot_enabled = true;
 } aimbot_settings;
 
 static Timer aimbot_poll_timer(aimbot_settings.aimbot_poll_frequency);
@@ -994,10 +1020,12 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
         if (player_found) {
             target_acceleration = (target_velocity - velocity_previous) / (delta_time / 1000.0);  //(aimbot::aimbot_settings.acceleration_delta_in_ms/1000.0);
 
+            //target_acceleration = target_player->character_->CharacterMovement->Acceleration.Unit() * target_acceleration.Magnitude();
+
             //cout << "Custom accecl: " << target_acceleration.X << ", " << target_acceleration.Y << ", " << target_acceleration.Z << endl;
             //cout << "Real accecl: " << target_player->character_->CharacterMovement->Acceleration.X << ", " << target_player->character_->CharacterMovement->Acceleration.Y << ", " << target_player->character_->CharacterMovement->Acceleration.Z << endl << endl;
-          
-            //cout << delta_time << endl;
+
+            // cout << delta_time << endl;
         }
     }
 
@@ -1291,18 +1319,27 @@ void Tick(void) {
                 FVector2D projection = game_functions::Project(prediction);
                 float height = -1;
 
-                if ((imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) && height == -1) {
+                if (((imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) && height == -1) || aimbot_settings.triggerbot_enabled) {
                     FVector2D center_projection = game_functions::Project(target_player.location_);
                     target_player.location_.Z += esp::esp_settings.player_height;  // this is HALF the height in reality
                     FVector2D head_projection = game_functions::Project(target_player.location_);
                     target_player.location_.Z -= esp::esp_settings.player_height;  // this is HALF the height in reality
                     height = abs(head_projection.Y - center_projection.Y);
+
+                    if (aimbot_settings.triggerbot_enabled) {
+                        float width = esp::esp_settings.width_to_height_ratio * height;
+                        if (abs(game_data::screen_center.X - projection.X) < width && abs(game_data::screen_center.Y - projection.Y) < height) {
+                            if (game_data::my_player.weapon_ == game_data::Weapon::disk || game_data::my_player.weapon_ == game_data::Weapon::gl || game_data::my_player.weapon_ == game_data::Weapon::plasma || game_data::my_player.weapon_ == game_data::Weapon::blaster) {
+                                other::SendLeftMouseClick();
+                            }
+                        }
+                    }
                 }
 
                 projections_of_predictions.push_back(projection);
                 aimbot_information.push_back({(prediction - game_data::my_player.location_).Magnitude(), projection, height});
 
-                //cout << (int)target_player.character_->AccelInfo << endl;
+                // cout << (int)target_player.character_->AccelInfo << endl;
             }
         }
     } else {
@@ -1321,8 +1358,7 @@ void Tick(void) {
             if (!game_functions::IsInHorizontalFieldOfView(player->location_, aimbot_settings.aimbot_horizontal_fov_angle))
                 continue;
 
-
-            //aimbot::aimbot_settings.use_acceleration = false;
+            // aimbot::aimbot_settings.use_acceleration = false;
 
             bool result = PredictAimAtTarget(&*p, &prediction, muzzle_offset);
 
@@ -1330,12 +1366,21 @@ void Tick(void) {
                 FVector2D projection = game_functions::Project(prediction);
                 float height = -1;
 
-                if ((imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) && height == -1) {
+                if (((imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kBounds || imgui::visuals::aimbot_visual_settings.marker_style == imgui::visuals::MarkerStyle::kFilledBounds) && height == -1) || aimbot_settings.triggerbot_enabled) {
                     FVector2D center_projection = game_functions::Project(player->location_);
                     player->location_.Z += esp::esp_settings.player_height;  // this is HALF the height in reality
                     FVector2D head_projection = game_functions::Project(player->location_);
                     player->location_.Z -= esp::esp_settings.player_height;  // this is HALF the height in reality
                     height = abs(head_projection.Y - center_projection.Y);
+
+                    if (aimbot_settings.triggerbot_enabled) {
+                        float width = esp::esp_settings.width_to_height_ratio * height;
+                        if (abs(game_data::screen_center.X - projection.X) < width && abs(game_data::screen_center.Y - projection.Y) < height) {
+                            if (game_data::my_player.weapon_ == game_data::Weapon::disk || game_data::my_player.weapon_ == game_data::Weapon::gl || game_data::my_player.weapon_ == game_data::Weapon::plasma || game_data::my_player.weapon_ == game_data::Weapon::blaster) {
+                                other::SendLeftMouseClick();
+                            }
+                        }
+                    }
                 }
 
                 projections_of_predictions.push_back(projection);
@@ -1525,7 +1570,7 @@ void DrawAimAssistMenuNew(void) {
 
             ImGui::Checkbox("Factor target acceleration", &aimbot::aimbot_settings.use_acceleration);
             if (aimbot::aimbot_settings.use_acceleration) {
-                //ImGui::SliderFloat("Acceleration delta (ms)", &aimbot::aimbot_settings.acceleration_delta_in_ms, 1, 1000);
+                // ImGui::SliderFloat("Acceleration delta (ms)", &aimbot::aimbot_settings.acceleration_delta_in_ms, 1, 1000);
             }
 
             ImGui::Unindent();
@@ -1621,6 +1666,14 @@ void DrawAimAssistMenuNew(void) {
                 }
             }
         }
+
+        if (ImGui::CollapsingHeader("Triggerbot settings")) {
+            ImGui::Indent();
+            ImGui::Checkbox("Enable triggerbot", &aimbot::aimbot_settings.triggerbot_enabled);
+            ImGui::Text("Triggerbot does not work for the chaingun as it is a hold to fire weapon.");
+            ImGui::Unindent();
+        }
+
         ImGui::EndTable();
     }
 }
@@ -1777,6 +1830,15 @@ void DrawOtherMenuNew(void) {
 
             ImGui::Unindent();
         }
+
+        /*
+        if (ImGui::CollapsingHeader("Other settings")) {
+            ImGui::Indent();
+
+            //ImGui::Checkbox("Disable hitmarkers", &other::other_settings.disable_hitmarker);
+
+            ImGui::Unindent();
+        }*/
 
         /*
         if (ImGui::CollapsingHeader("Other options")) {
