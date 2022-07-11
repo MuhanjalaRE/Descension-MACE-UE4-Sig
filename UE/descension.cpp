@@ -786,9 +786,10 @@ enum AimbotMode { kClosestDistance, kClosestXhair };
     bool friendly_fire = false;
     bool need_line_of_sight = false;
 
-    int aimbot_poll_frequency = 60;  //*5;
+    int aimbot_poll_frequency = 60 * 5;
 
     bool use_acceleration = true;
+    bool use_acceleration_cg_only = false;
     // float acceleration_delta_in_ms = 30;
 
     bool triggerbot_enabled = true;
@@ -878,7 +879,7 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
     acceleration is normalised -> a = a_ / |a_|
     */
     FVector target_acceleration = FVector();
-    if (aimbot::aimbot_settings.use_acceleration) {
+    if (aimbot::aimbot_settings.use_acceleration && (!aimbot_settings.use_acceleration_cg_only || (aimbot_settings.use_acceleration_cg_only && (game_data::game_data.my_player_information.weapon_ == game_data::Weapon::cg || game_data::game_data.my_player_information.weapon_ == game_data::Weapon::blaster)))) {
         FVector velocity_previous = FVector();
         bool player_found = false;
         for (vector<game_data::information::Player>::iterator player = players_previous.begin(); player != players_previous.end(); player++) {
@@ -1042,7 +1043,7 @@ void Tick(void) {
     if (!aimbot_settings.enabled /*|| !enabled*/ || !aimbot_poll_timer.IsReady())
         return;
 
-    //static std::chrono::steady_clock::time_point previous_tick = std::chrono::steady_clock::now();
+    // static std::chrono::steady_clock::time_point previous_tick = std::chrono::steady_clock::now();
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     delta_time = std::chrono::duration<float>(now - previous_tick).count() * 1000.0;
     previous_tick = now;
@@ -1313,7 +1314,13 @@ void DrawAimAssistMenuNew(void) {
                 aimbot::aimbot_poll_timer.SetFrequency(aimbot::aimbot_settings.aimbot_poll_frequency);
             }
 
+            // ImGui::Checkbox("Factor target acceleration (Chaingun only)", &aimbot::aimbot_settings.use_acceleration);
             ImGui::Checkbox("Factor target acceleration", &aimbot::aimbot_settings.use_acceleration);
+            if (aimbot::aimbot_settings.use_acceleration) {
+                ImGui::Checkbox("Factor for Chaingun only", &aimbot::aimbot_settings.use_acceleration_cg_only);
+            }
+
+            // ImGui::Text("Factor target accel")
             if (aimbot::aimbot_settings.use_acceleration) {
                 // ImGui::SliderFloat("Acceleration delta (ms)", &aimbot::aimbot_settings.acceleration_delta_in_ms, 1, 1000);
             }
@@ -1415,7 +1422,7 @@ void DrawAimAssistMenuNew(void) {
         if (ImGui::CollapsingHeader("Triggerbot settings")) {
             ImGui::Indent();
             ImGui::Checkbox("Enable triggerbot", &aimbot::aimbot_settings.triggerbot_enabled);
-            ImGui::Text("Triggerbot does not work for the chaingun as it is a hold to fire weapon.");
+            ImGui::Text("Triggerbot does not work for the Chaingun as it is a hold to fire weapon.");
             ImGui::Unindent();
         }
 
@@ -1886,7 +1893,7 @@ void DrawImGuiInUE4(void) {
     }
 
     if (dx11::imgui_show_menu) {
-        //static bool unused_boolean = true;
+        // static bool unused_boolean = true;
 
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
