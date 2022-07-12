@@ -106,7 +106,7 @@ HRESULT __stdcall ID3D11DeviceContextDrawIndexed(ID3D11DeviceContext* pContext, 
 
 extern HANDLE game_dx_mutex = CreateMutex(NULL, false, NULL);
 
-extern bool imgui_show_menu = true;
+extern bool imgui_show_menu = false;
 static bool initialised = false;
 static HWND hwnd = NULL;
 

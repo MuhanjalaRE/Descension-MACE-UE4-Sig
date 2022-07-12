@@ -78,6 +78,9 @@
     <ClInclude Include="sigscanner.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
+    <ClInclude Include="json.hpp">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -143,5 +146,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Descension_MACE.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
