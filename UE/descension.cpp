@@ -789,7 +789,7 @@ enum AimbotMode { kClosestDistance, kClosestXhair };
     int aimbot_poll_frequency = 60 * 5;
 
     bool use_acceleration = true;
-    bool use_acceleration_cg_only = false;
+    bool use_acceleration_cg_only = true;
     // float acceleration_delta_in_ms = 30;
 
     bool triggerbot_enabled = true;
@@ -1275,7 +1275,7 @@ void DrawInformationMenuNew(void) {
         ImGui::Indent();
         const char* info0 =
             "descension v1.4 (Public)\n"
-            "Released: 11/07/2022\n";
+            "Released: 12/07/2022\n";
         //"Game version: -";
 
         const char* info1 =
@@ -1317,7 +1317,9 @@ void DrawAimAssistMenuNew(void) {
             // ImGui::Checkbox("Factor target acceleration (Chaingun only)", &aimbot::aimbot_settings.use_acceleration);
             ImGui::Checkbox("Factor target acceleration", &aimbot::aimbot_settings.use_acceleration);
             if (aimbot::aimbot_settings.use_acceleration) {
+                ImGui::Indent();
                 ImGui::Checkbox("Factor for Chaingun only", &aimbot::aimbot_settings.use_acceleration_cg_only);
+                ImGui::Unindent();
             }
 
             // ImGui::Text("Factor target accel")
@@ -1898,13 +1900,17 @@ void DrawImGuiInUE4(void) {
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
 
-        ImGui::SetNextWindowPos({300, 300}, ImGuiCond_FirstUseEver);
+        // ImGui::SetNextWindowPos({300, 300}, ImGuiCond_FirstUseEver);
 
-        ImGui::SetNextWindowSize({800, 500}, ImGuiCond_FirstUseEver);
+        ImVec2 window_size_(800, 500);
+
+        ImGui::SetNextWindowSize(window_size_, ImGuiCond_FirstUseEver);
+        ImVec2 display_size = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowPos({display_size.x / 2 - window_size_.x / 2, display_size.y / 2 - window_size_.y / 2}, ImGuiCond_FirstUseEver);
 
         /* static */ ImVec2 padding = ImGui::GetStyle().FramePadding;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding.x, 8));
-        ImGui::Begin("descension v1.2", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
+        ImGui::Begin("descension v1.4", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
         ImGui::PopStyleVar();
 
         ImVec2 window_position = ImGui::GetWindowPos();
