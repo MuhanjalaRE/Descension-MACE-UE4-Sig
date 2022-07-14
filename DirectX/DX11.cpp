@@ -1,4 +1,4 @@
-//#define USE_DETOURS // Comment this to make a midfunction hook on Preset, but this casues issues with discord overlay (SAFE/WORKING) // Seems like even detours crash when discord overlay is hooked in, so might as well use midfunctionhook for extra safety?
+#define USE_DETOURS // Comment this to make a midfunction hook on Preset, but this casues issues with discord overlay (SAFE/WORKING) // Seems like even detours crash when discord overlay is hooked in, so might as well use midfunctionhook for extra safety?
 #define USE_DETOURS_FOR_RESIZE_BUFFERS //Comment this midfunction hook on ResizeBuffers, but this midfunction hook crashes so use detours for now (DANGEROUS/BROKEN)
 
 #include <iostream>
