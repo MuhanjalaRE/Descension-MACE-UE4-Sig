@@ -28,6 +28,9 @@
     <Filter Include="Resource Files\UE">
       <UniqueIdentifier>{6fee61af-0f13-41e4-80c9-1b065f5e0e3e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\Hook">
+      <UniqueIdentifier>{dd11e5bb-1c54-4c95-b9e5-0a43f6bfee08}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -80,6 +83,9 @@
     </ClInclude>
     <ClInclude Include="json.hpp">
       <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Hook\Hook.h">
+      <Filter>Resource Files\Hook</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +148,9 @@
     </ClCompile>
     <ClCompile Include="SDK\SDK\WBP_ProgressionEventOverlay_functions.cpp">
       <Filter>Resource Files\SDK</Filter>
+    </ClCompile>
+    <ClCompile Include="Hook\Hook.cpp">
+      <Filter>Resource Files\Hook</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

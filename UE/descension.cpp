@@ -100,7 +100,7 @@ struct Marker {
     bool draw_axes = true;
 
     float zoom_ = 0.004;
-    float zoom = 4;
+    float zoom = 1;
     int window_size = 300 * 1.25;
     ImVec2 window_location = {100, 100};
     float border = 5;

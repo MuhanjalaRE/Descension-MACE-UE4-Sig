@@ -1,14 +1,24 @@
+//#define USE_DETOURS // Comment this to make a midfunction hook on Preset, but this casues issues with discord overlay (SAFE/WORKING) // Seems like even detours crash when discord overlay is hooked in, so might as well use midfunctionhook for extra safety?
+#define USE_DETOURS_FOR_RESIZE_BUFFERS //Comment this midfunction hook on ResizeBuffers, but this midfunction hook crashes so use detours for now (DANGEROUS/BROKEN)
+
 #include <iostream>
 #include <string>
 
 #include "DX11.h"
 #include "ue.h"
 
-#include "detours.h"
-
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
+
+#ifdef USE_DETOURS
+#include "detours.h"
+#else
+#ifdef USE_DETOURS_FOR_RESIZE_BUFFERS
+#include "detours.h"
+#endif
+#include "Hook.h"
+#endif
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK hWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -150,10 +160,14 @@ HRESULT __stdcall IDXGISwapChainPresent(IDXGISwapChain* swapchain, UINT sync_int
         DWORD64 swapchain_resizebuffers_first_instruction = *((DWORD64*)swapchain_vmt_resizebuffers);
         original_swapchain_resizebuffers = (_IDXGISwapChainResizeBuffers)swapchain_resizebuffers_first_instruction;
 
+#ifdef USE_DETOURS_FOR_RESIZE_BUFFERS
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
         DetourAttach(&(PVOID&)original_swapchain_resizebuffers, IDXGISwapChainResizeBuffers);
         DetourTransactionCommit();
+#else
+        Hook64::MidFunctionHook* resize_buffers_hook = new Hook64::MidFunctionHook(swapchain_resizebuffers_first_instruction, (DWORD64)IDXGISwapChainResizeBuffers, 0x0, 0x10);
+#endif
     }
 
     ue::UE4_();
@@ -202,7 +216,11 @@ HRESULT __stdcall IDXGISwapChainPresent(IDXGISwapChain* swapchain, UINT sync_int
     ue::frame_is_ready = true;
     ReleaseMutex(game_dx_mutex);
 
-    HRESULT res = original_swapchain_present(swapchain, sync_interval_, flags_);
+    HRESULT res = -1;
+
+#ifdef USE_DETOURS
+    res = original_swapchain_present(swapchain, sync_interval_, flags_);
+#endif
     return res;
 }
 
@@ -212,7 +230,11 @@ HRESULT IDXGISwapChainResizeBuffers(IDXGISwapChain* pThis, UINT BufferCount, UIN
         main_render_target_view->Release();
     }
 
-    HRESULT hr = original_swapchain_resizebuffers(pThis, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+    HRESULT hr = -1;
+
+#ifdef USE_DETOURS_FOR_RESIZE_BUFFERS
+    hr = original_swapchain_resizebuffers(pThis, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+#endif
 
     ID3D11Texture2D* pBuffer;
     pThis->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&pBuffer);
@@ -288,10 +310,14 @@ bool Hook(void) {
         DWORD64 swapchain_present_first_instruction = *((DWORD64*)swapchain_vmt_present);
         original_swapchain_present = (_IDXGISwapChainPresent)swapchain_present_first_instruction;
 
+#ifdef USE_DETOURS
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
         DetourAttach(&(PVOID&)original_swapchain_present, IDXGISwapChainPresent);
         DetourTransactionCommit();
+#else
+        Hook64::MidFunctionHook* present_mid_function_hook = new Hook64::MidFunctionHook(swapchain_present_first_instruction, (DWORD64)IDXGISwapChainPresent, 0x37, 0x4c);
+#endif
 
         return true;
     }

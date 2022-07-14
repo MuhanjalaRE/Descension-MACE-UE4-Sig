@@ -24,6 +24,6 @@
 #include <utility>
 
 #include "SDK.h"
-#include "detours.h"
+//#include "detours.h"
 
 #endif //PCH_H
