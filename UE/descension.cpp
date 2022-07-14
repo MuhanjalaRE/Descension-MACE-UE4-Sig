@@ -1,11 +1,11 @@
 #include "pch.h"
 #include "sigscanner.h"
 
-#include "json.hpp"
+//#include "json.hpp"
 
 using namespace std;
 using namespace CG;
-using json = nlohmann::json;
+//using json = nlohmann::json;
 
 /* static */ DWORD64 uworld_offset = 0;
 // static const DWORD64 processevent_offset = 0xEE57C0;
@@ -135,16 +135,6 @@ struct Marker {
         marker_colour = {0, 255, 0, 255};
     }
 } crosshair_settings;
-
-/* static */ struct RoutteVisualSettings : Marker {
-    bool rainbow_gradient = true;
-    RoutteVisualSettings(void) {
-        marker_style = MarkerStyle::kDot;
-        marker_size = 3;
-        marker_thickness = 1;
-        marker_colour = {0, 0, 255, 200};
-    }
-} route_visual_settings;
 
 void DrawMarker(MarkerStyle marker_style, ImVec2 center, ImColor marker_colour, int marker_size, int marker_thickness) {
     ImDrawList* imgui_draw_list = ImGui::GetWindowDrawList();
@@ -800,7 +790,7 @@ enum AimbotMode { kClosestDistance, kClosestXhair };
     bool friendly_fire = false;
     bool need_line_of_sight = false;
 
-    int aimbot_poll_frequency = 4 * 5;  // 60 * 5;
+    int aimbot_poll_frequency = 60 * 5;
 
     bool use_acceleration = true;
     bool use_acceleration_cg_only = false;
@@ -1270,179 +1260,11 @@ void Tick(void) {
 
 }  // namespace radar
 
-namespace routes {
-
-/* static */ struct RouteSettings {
-    bool enabled = false;
-    int route_poll_frequency = 60;
-    bool swap_team = false;
-} route_settings;
-
-bool route_file_is_loaded = false;
-static json loaded_route_file;
-
-struct RouteTrail {
-    string routeName;
-    string routeDescription;
-    int teamId;
-    FVector flagGrabMarker_location;
-    vector<FVector> markerLocations;
-};
-
-struct Routes {
-    string mapName;
-    string author;
-    vector<struct RouteTrail> routeTrails;
-
-    int selected_route_trail_index = 0;
-    const char* route_trail_names[256];
-} loaded_routes;
-
-bool ParseLoadedRouteFile(void) {
-    loaded_routes.mapName = loaded_route_file["mapName"].get<std::string>();
-    loaded_routes.author = loaded_route_file["author"].get<std::string>();
-
-    loaded_routes.routeTrails.clear();
-    loaded_routes.selected_route_trail_index = 0;
-
-    json route_trails = loaded_route_file["routeTrails"];
-
-    for (json::iterator it = route_trails.begin(); it != route_trails.end(); ++it) {
-        RouteTrail route_trail;
-        route_trail.routeName = (*it)["routeName"].get<std::string>();
-        route_trail.routeDescription = (*it)["routeDescription"].get<std::string>();
-        route_trail.teamId = (*it)["teamId"].get<int>();
-        route_trail.flagGrabMarker_location.X = (*it)["flagGrabMarker"]["location"]["x"].get<float>();
-        route_trail.flagGrabMarker_location.Y = (*it)["flagGrabMarker"]["location"]["y"].get<float>();
-        route_trail.flagGrabMarker_location.Z = (*it)["flagGrabMarker"]["location"]["z"].get<float>();
-
-        json marker_locations = (*it)["markerLocations"];
-        for (json::iterator it = marker_locations.begin(); it != marker_locations.end(); it++) {
-            FVector location;
-            location.X = (*it)["location"]["x"].get<float>();
-            location.Y = (*it)["location"]["y"].get<float>();
-            location.Z = (*it)["location"]["z"].get<float>();
-            route_trail.markerLocations.push_back(location);
-        }
-
-        loaded_routes.routeTrails.push_back(route_trail);
-    }
-
-    for (int i = 0; i < loaded_routes.routeTrails.size(); i++) {
-        loaded_routes.route_trail_names[i] = loaded_routes.routeTrails[i].routeName.c_str();
-    }
-
-    return false;
-}
-
-bool LoadRouteFile(const char* filename) {
-    std::ifstream ifs(filename);
-    loaded_route_file = json::parse(ifs);
-    ParseLoadedRouteFile();
-    route_file_is_loaded = true;
-    return false;
-}
-
-bool LoadRouteFile(string s) {
-    loaded_route_file = json::parse(s);
-    ParseLoadedRouteFile();
-    route_file_is_loaded = true;
-    return false;
-}
-
-/* static */ Timer route_draw_poll_timer(route_settings.route_poll_frequency);
-
-vector<FVector2D> projections_of_markers;
-// vector<FVector2D> projections_of_markers2;
-vector<int> index_of_projections_of_markers;
-
-void Tick(void) {
-    if (route_file_is_loaded && route_settings.enabled) {
-        // loaded_routes.selected_route_trail_index = 0;
-        float distance = -1;
-        int index = 0;
-        for (vector<struct RouteTrail>::iterator i = loaded_routes.routeTrails.begin(); i != loaded_routes.routeTrails.end(); i++) {
-            FVector start_location = i->markerLocations[0];
-            if (route_settings.swap_team) {
-                start_location.X *= -1;
-                start_location.Y *= -1;
-            }
-            float d = (start_location - game_data::my_player.location_).Magnitude();
-            if (d < distance || distance < 0) {
-                distance = d;
-                loaded_routes.selected_route_trail_index = index;
-            }
-            index++;
-        }
-    }
-
-    if (!route_draw_poll_timer.IsReady() || !route_file_is_loaded || !route_settings.enabled)
-        return;
-
-    // route_draw_poll_timer.Tick();
-
-    projections_of_markers.clear();
-    // projections_of_markers2.clear();
-    index_of_projections_of_markers.clear();
-
-    if (!game_data::my_player.is_valid_)
-        ;  // return;
-
-    // Rotator rotation = game_data::my_player_object.GetRotation();
-    // Vector rotation_vector = math::RotatorToVector(rotation);
-
-    if (route_settings.enabled && route_file_is_loaded) {
-        vector<FVector>* locations = &loaded_routes.routeTrails[loaded_routes.selected_route_trail_index].markerLocations;
-        int route_trail_team_id = loaded_routes.routeTrails[loaded_routes.selected_route_trail_index].teamId;
-
-        int j = -1;
-        for (vector<FVector>::iterator i = locations->begin(); i != locations->end(); i++) {
-            j++;
-            FVector marker_location = *i;
-
-            if (route_settings.swap_team) {
-                marker_location.X *= -1;
-                marker_location.Y *= -1;
-            }
-
-            if (!game_functions::IsInFieldOfView(marker_location))
-                continue;
-
-            static FVector2D projection_vector;
-            projection_vector = game_functions::Project(marker_location);
-            projections_of_markers.push_back(projection_vector);
-            index_of_projections_of_markers.push_back(j);
-        }
-    }
-}
-
-void NextRouteTrail(void) {
-    if (!route_file_is_loaded) {
-        return;
-    }
-    if (loaded_routes.routeTrails.size() > 0) {
-        loaded_routes.selected_route_trail_index = (loaded_routes.selected_route_trail_index + 1) % loaded_routes.routeTrails.size();
-    }
-}
-
-void PreviousRouteTrail(void) {
-    if (!route_file_is_loaded) {
-        return;
-    }
-    if (loaded_routes.routeTrails.size() > 0) {
-        loaded_routes.selected_route_trail_index--;
-        if (loaded_routes.selected_route_trail_index < 0) {
-            loaded_routes.selected_route_trail_index += loaded_routes.routeTrails.size();
-        }
-    }
-}
-
-}  // namespace routes
 
 namespace imgui {
 namespace imgui_menu {
-enum LeftMenuButtons { kAimAssist, kESP, kRadar, kOther, kRoutes, kInformation };
-/* static */ const char* button_text[] = {"Aim assist", "ESP", "Radar", "Other", "-", "Information"};
+enum LeftMenuButtons { kAimAssist, kESP, kRadar, kOther, kInformation };
+/* static */ const char* button_text[] = {"Aim assist", "ESP", "Radar", "Other", "Information"};
 /* static */ const int buttons_num = sizeof(button_text) / sizeof(char*);
 /* static */ int selected_index = LeftMenuButtons::kInformation;  // LeftMenuButtons::kAimAssist;
 /* static */ float item_width = -150;
@@ -1457,8 +1279,8 @@ void DrawInformationMenuNew(void) {
         ImGui::PushItemWidth(item_width);
         ImGui::Indent();
         const char* info0 =
-            "descension v1.4 (Public)\n"
-            "Released: 12/07/2022\n";
+            "descension v1.5 (Public)\n"
+            "Released: 14/07/2022\n";
         //"Game version: -";
 
         const char* info1 =
@@ -1626,7 +1448,7 @@ void DrawRadarMenuNew(void) {
         if (ImGui::CollapsingHeader("General settings")) {
             ImGui::Indent();
             ImGui::Checkbox("Enabled##radar_enabled", &radar::radar_settings.enabled);
-            if (ImGui::SliderInt("Poll rate (Hz)##routes", &radar::radar_settings.radar_poll_frequency, 1, 300)) {
+            if (ImGui::SliderInt("Poll rate (Hz)##radar", &radar::radar_settings.radar_poll_frequency, 1, 300)) {
                 radar::get_radar_data_timer.SetFrequency(radar::radar_settings.radar_poll_frequency);
             }
 
@@ -1789,84 +1611,6 @@ void DrawOtherMenuNew(void) {
     }
 }
 
-void DrawRoutesMenuNew(void) {
-    static Timer routes_file_check_timer(5);
-    static ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable | (ImGuiTableFlags_ContextMenuInBody & 0) | (ImGuiTableFlags_NoBordersInBody & 0) | ImGuiTableFlags_BordersOuter;
-    if (ImGui::BeginTable("routestable", 1, flags, ImVec2(0, ImGui::GetContentRegionAvail().y))) {
-        ImGui::TableSetupColumn("Routes", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableHeadersRow();
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        ImGui::PushItemWidth(item_width);
-        if (ImGui::CollapsingHeader("General settings")) {
-            ImGui::Indent();
-            ImGui::Checkbox("Enabled##route_enabled", &routes::route_settings.enabled);
-            if (ImGui::SliderInt("Poll rate (Hz)##routes", &routes::route_settings.route_poll_frequency, 1, 300)) {
-                routes::route_draw_poll_timer.SetFrequency(routes::route_settings.route_poll_frequency);
-            }
-            ImGui::Checkbox("Swap team (Mirror)", &routes::route_settings.swap_team);
-            ImGui::Unindent();
-        }
-
-        if (ImGui::CollapsingHeader("Route selection")) {
-            ImGui::Indent();
-
-            static const char* route_filenames[256];
-            static const char* route_paths[256];
-
-            if (routes::route_file_is_loaded) {
-                if (ImGui::Combo("Route trails##trail_combo", &routes::loaded_routes.selected_route_trail_index, routes::loaded_routes.route_trail_names, routes::loaded_routes.routeTrails.size())) {
-                }
-            } else {
-                ImGui::Text("No route file currently loaded.");
-            }
-
-            ImGui::Unindent();
-        }
-
-        if (ImGui::CollapsingHeader("Markers")) {
-            ImGui::Indent();
-            float marker_preview_size = 100;
-
-            ImGui::Combo("Style##aim_assist_combo", (int*)&visuals::route_visual_settings.marker_style, visuals::marker_labels, IM_ARRAYSIZE(visuals::marker_labels)-2);
-            ImGui::ColorEdit4("Colour", &visuals::route_visual_settings.marker_colour.Value.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
-            ImGui::Checkbox("Rainbow gradient", &visuals::route_visual_settings.rainbow_gradient);
-            ImGui::SliderInt("Radius", &visuals::route_visual_settings.marker_size, 1, 50);
-
-            if (visuals::route_visual_settings.marker_style == visuals::MarkerStyle::kCircle || visuals::route_visual_settings.marker_style == visuals::MarkerStyle::kSquare) {
-                ImGui::SliderInt("Thickness", &visuals::route_visual_settings.marker_thickness, 1, 10);
-            }
-
-            ImGui::Text("Marker preview");
-
-            ImVec2 window_position = ImGui::GetWindowPos();
-            ImVec2 window_size = ImGui::GetWindowSize();
-
-            ImDrawList* imgui_draw_list = ImGui::GetWindowDrawList();
-            ImVec2 current_cursor_pos = ImGui::GetCursorPos();
-            ImVec2 local_cursor_pos = {window_position.x + ImGui::GetCursorPosX(), window_position.y + ImGui::GetCursorPosY() - ImGui::GetScrollY()};
-            imgui_draw_list->AddRectFilled(local_cursor_pos, {local_cursor_pos.x + marker_preview_size, local_cursor_pos.y + marker_preview_size}, ImColor(0, 0, 0, 255), 0, 0);
-            ImVec2 center = {local_cursor_pos.x + marker_preview_size / 2, local_cursor_pos.y + marker_preview_size / 2};
-
-            imgui::visuals::DrawMarker((imgui::visuals::MarkerStyle)visuals::route_visual_settings.marker_style, center, visuals::route_visual_settings.marker_colour, visuals::route_visual_settings.marker_size, visuals::route_visual_settings.marker_thickness);
-
-            current_cursor_pos.y += marker_preview_size;
-            ImGui::SetCursorPos(current_cursor_pos);
-
-            ImGui::Spacing();
-            ImGui::Unindent();
-        }
-
-        
-
-		if (ImGui::Button("Load")) {
-            //#include "resource.h"
-            //routes::LoadRouteFile(elite);
-		}
-        ImGui::EndTable();
-    }
-}
-
 }  // namespace imgui_menu
 
 }  // namespace imgui
@@ -1911,7 +1655,6 @@ PROCESSEVENT_HOOK_FUNCTION(UEHookMain) {
         aimbot::Tick();
         radar::Tick();
         esp::Tick();
-        //routes::Tick();
         other::Tick();
 
         // Just get screen resolution every frame, who cares
@@ -2171,7 +1914,7 @@ void DrawImGuiInUE4(void) {
 
         /* static */ ImVec2 padding = ImGui::GetStyle().FramePadding;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding.x, 8));
-        ImGui::Begin("descension v1.4", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
+        ImGui::Begin("descension v1.5", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
         ImGui::PopStyleVar();
 
         ImVec2 window_position = ImGui::GetWindowPos();
@@ -2216,9 +1959,6 @@ void DrawImGuiInUE4(void) {
         switch (imgui_menu::selected_index) {
             case imgui_menu::LeftMenuButtons::kInformation:
                 imgui_menu::DrawInformationMenuNew();
-                break;
-            case imgui_menu::LeftMenuButtons::kRoutes:
-                imgui_menu::DrawRoutesMenuNew();
                 break;
             case imgui_menu::LeftMenuButtons::kAimAssist:
                 imgui_menu::DrawAimAssistMenuNew();
