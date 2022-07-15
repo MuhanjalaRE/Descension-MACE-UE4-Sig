@@ -625,13 +625,13 @@ FVector2D Project(FVector location) {
         int level = game_data::my_player.character_->ZoomInfo.Level;
         switch (level) {
             case 0:
-                fov = 70; //(70.0 / 120.0);
+                fov *= (70.0 / 120.0);
                 break;
             case 1:
-                fov = 27.876;  //(27.876 / 120.0);
+                fov *= (27.876 / 120.0);
                 break;
             case 2:
-                fov = 14.0;  //(14.0 / 120.0);
+                fov *= (14.0 / 120.0);
             default:
                 break;
         }
