@@ -621,8 +621,8 @@ FVector2D Project(FVector location) {
 
     // fov = fovv;
 
-    if (((AMACharacter*)game_data::local_player->PlayerController->Character)->ZoomInfo.bEnabled) {
-        int level = ((AMACharacter*)game_data::local_player->PlayerController->Character)->ZoomInfo.Level;
+    if (game_data::my_player.is_valid_ && game_data::my_player.character_->ZoomInfo.bEnabled) {
+        int level = game_data::my_player.character_->ZoomInfo.Level;
         switch (level) {
             case 0:
                 fov *= (70.0 / 120.0);
