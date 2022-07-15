@@ -3,6 +3,8 @@
 
 //#include "json.hpp"
 
+#define USE_AIMTRACKER
+
 using namespace std;
 using namespace CG;
 // using json = nlohmann::json;
@@ -486,7 +488,6 @@ void GetPlayers(void) {
 
                 my_player.rotation_ = local_player_controller->ControlRotation;
                 my_player.forward_vector_ = math::RotatorToVector(local_player_controller->ControlRotation).Unit();
-
             }
         }
     }
@@ -612,10 +613,29 @@ bool InLineOfSight(AActor* actor) {
     /*return game_data::local_player_controller->LineOfSightTo(actor, FVector(), false);*/
 }
 
+// float fovv = 120;
 FVector2D Project(FVector location) {
     FRotator r = game_data::local_player->PlayerController->PlayerCameraManager->CameraCachePrivate.POV.Rotation;
     FVector cam_location = game_data::local_player->PlayerController->PlayerCameraManager->CameraCachePrivate.POV.Location;
     float fov = game_data::local_player->PlayerController->PlayerCameraManager->CameraCachePrivate.POV.FOV;
+
+    // fov = fovv;
+
+    if (((AMACharacter*)game_data::local_player->PlayerController->Character)->ZoomInfo.bEnabled) {
+        int level = ((AMACharacter*)game_data::local_player->PlayerController->Character)->ZoomInfo.Level;
+        switch (level) {
+            case 0:
+                fov *= (70.0 / 120.0);
+                break;
+            case 1:
+                fov *= (27.876 / 120.0);
+                break;
+            case 2:
+                fov *= (14.0 / 120.0);
+            default:
+                break;
+        }
+    }
 
     FVector rot(r.Pitch, r.Yaw, r.Roll);
     FVector loc(cam_location.X, cam_location.Y, cam_location.Z);
@@ -1509,8 +1529,8 @@ void DrawInformationMenuNew(void) {
         ImGui::PushItemWidth(item_width);
         ImGui::Indent();
         const char* info0 =
-            "descension v1.5 (Public)\n"
-            "Released: 14/07/2022\n";
+            "descension v1.6 (Public)\n"
+            "Released: 15/07/2022\n";
         //"Game version: -";
 
         const char* info1 =
@@ -1823,11 +1843,12 @@ void DrawOtherMenuNew(void) {
         /*
         if (ImGui::CollapsingHeader("Other settings")) {
             ImGui::Indent();
-
-            //ImGui::Checkbox("Disable hitmarkers", &other::other_settings.disable_hitmarker);
+            //ImGui::SliderFloat("FOV", &game_functions::fovv, 0, 120);
+            // ImGui::Checkbox("Disable hitmarkers", &other::other_settings.disable_hitmarker);
 
             ImGui::Unindent();
-        }*/
+        }
+        */
 
         /*
         if (ImGui::CollapsingHeader("Other options")) {
@@ -1837,11 +1858,13 @@ void DrawOtherMenuNew(void) {
         }
         */
 
+#ifdef USE_AIMTRACKER
         if (ImGui::CollapsingHeader("Aim tracker")) {
             ImGui::Indent();
 
             ImGui::Checkbox("Enabled", &aimtracker::aimtracker_settings.enabled);
 
+#ifdef SHOW_AIMTRACKER_SETTINGS
             static float f_lifetime = aimtracker::aim_tracker_tick_manager.GetLifeTime();
             static int i_maxcount = aimtracker::aim_tracker_tick_manager.GetMaxCount();
             static int i_ticks_per_second = aimtracker::aim_tracker_tick_manager.GetTicksPerSecond();
@@ -1872,64 +1895,20 @@ void DrawOtherMenuNew(void) {
             if (ImGui::SliderFloat("Yaw zoom", &f_zoom_yaw, 1, 5)) {
                 aimtracker::aim_tracker_tick_manager.SetZoomYaw(f_zoom_yaw);
             }
-            /*
-            if (ImGui::SliderFloat("Window size", &f_tool_window_size, 200, 1200)) {
-                aimtracker::aimtracker_settings.window_size = {f_tool_window_size, f_tool_window_size};
-            }
-            */
+/*
+if (ImGui::SliderFloat("Window size", &f_tool_window_size, 200, 1200)) {
+    aimtracker::aimtracker_settings.window_size = {f_tool_window_size, f_tool_window_size};
+}
+*/
+#endif
 
             // ImGui::Unindent();
         }
+#endif
 
         ImGui::EndTable();
     }
 }
-
-void DrawAimTrackerMenu(void) {
-    ImGui::BeginGroup();
-
-    ImGui::Checkbox("Enabled", &aimtracker::aimtracker_settings.enabled);
-
-    static float f_lifetime = aimtracker::aim_tracker_tick_manager.GetLifeTime();
-    static int i_maxcount = aimtracker::aim_tracker_tick_manager.GetMaxCount();
-    static int i_ticks_per_second = aimtracker::aim_tracker_tick_manager.GetTicksPerSecond();
-
-    static float f_zoom_pitch = aimtracker::aim_tracker_tick_manager.GetZoomPitch();
-    static float f_zoom_yaw = aimtracker::aim_tracker_tick_manager.GetZoomYaw();
-
-    static float f_tool_window_size = aimtracker::aimtracker_settings.window_size.x;
-
-    ImGui::PushItemWidth(100);
-
-    if (ImGui::SliderInt("Max items", &i_maxcount, 1, 10000)) {
-        aimtracker::aim_tracker_tick_manager.SetMaxCount(i_maxcount);
-    }
-
-    if (ImGui::SliderFloat("Lifetime", &f_lifetime, 0, 60)) {
-        aimtracker::aim_tracker_tick_manager.SetLifeTime(f_lifetime);
-    }
-
-    if (ImGui::SliderInt("Ticks per second", &i_ticks_per_second, 1, 300)) {
-        aimtracker::aim_tracker_tick_manager.SetTicksPerSecond(i_ticks_per_second);
-    }
-
-    if (ImGui::SliderFloat("Pitch zoom", &f_zoom_pitch, 1, 5)) {
-        aimtracker::aim_tracker_tick_manager.SetZoomPitch(f_zoom_pitch);
-    }
-
-    if (ImGui::SliderFloat("Yaw zoom", &f_zoom_yaw, 1, 5)) {
-        aimtracker::aim_tracker_tick_manager.SetZoomYaw(f_zoom_yaw);
-    }
-
-    if (ImGui::SliderFloat("Window size", &f_tool_window_size, 200, 1200)) {
-        aimtracker::aimtracker_settings.window_size = {f_tool_window_size, f_tool_window_size};
-    }
-
-    ImGui::PopItemWidth();
-
-    ImGui::EndGroup();
-}
-
 }  // namespace imgui_menu
 
 }  // namespace imgui
@@ -1975,7 +1954,9 @@ PROCESSEVENT_HOOK_FUNCTION(UEHookMain) {
         radar::Tick();
         esp::Tick();
         other::Tick();
+#ifdef USE_AIMTRACKER
         aimtracker::Tick();
+#endif
 
         // Just get screen resolution every frame, who cares
         if (!got_resolution && game_data::local_player_controller && game_data::my_player.is_valid_) {
@@ -2218,6 +2199,7 @@ void DrawImGuiInUE4(void) {
         ImGui::End();
     }
 
+#ifdef USE_AIMTRACKER
     if (aimtracker::aimtracker_settings.enabled) {
         ImVec2 screen_size = ImGui::GetIO().DisplaySize;
         ImGui::SetNextWindowPos({screen_size.x - aimtracker::aimtracker_settings.window_size.x - 100, 100});
@@ -2263,6 +2245,7 @@ void DrawImGuiInUE4(void) {
 
         ImGui::PopStyleColor();
     }
+#endif
 
     if (dx11::imgui_show_menu) {
         // static bool unused_boolean = true;
@@ -2280,7 +2263,7 @@ void DrawImGuiInUE4(void) {
 
         /* static */ ImVec2 padding = ImGui::GetStyle().FramePadding;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding.x, 8));
-        ImGui::Begin("descension v1.5", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
+        ImGui::Begin("descension v1.6", NULL, ImGuiWindowFlags_AlwaysAutoResize & 0);
         ImGui::PopStyleVar();
 
         ImVec2 window_position = ImGui::GetWindowPos();
@@ -2363,6 +2346,10 @@ void GetWeapon(void) {
         } else if (max_ammo == 300) {
             my_player.weapon_ = Weapon::cg;
             my_player.weapon_type_ = WeaponType::kProjectileLinear;
+            /*
+            ABP_Chaingun_C* chaingun = ((ABP_Chaingun_C*)((AMACharacter*)game_data::local_player_controller->Character)->Weapon);
+            chaingun->BloomPatternRegions = 0; // Works but doesnt change server side?
+            */
         } else if (max_ammo == 21) {
             my_player.weapon_ = Weapon::gl;
             my_player.weapon_type_ = WeaponType::kProjectileArching;
