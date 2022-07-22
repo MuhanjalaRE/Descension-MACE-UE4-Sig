@@ -632,6 +632,7 @@ FVector2D Project(FVector location) {
                 break;
             case 2:
                 fov *= (14.0 / 120.0);
+                break;
             default:
                 break;
         }
@@ -842,7 +843,7 @@ vector<AimbotInformation> aimbot_information;
     float epsilon = 0.05 / 3;
 } aimbot_parameters_;
 
-bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* output_vector, FVector offset) {
+bool PredictAimAtTarget_(game_data::information::Player* target_player, FVector* output_vector, FVector offset) {
     float projectileSpeed;
     float inheritence;
     float ping;
@@ -956,8 +957,118 @@ bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* 
 
     float full_time = dt[i] + ping / 1000.0;
 
-    ping_prediction = prediction = (target_location + (target_velocity * full_time * 1) + (target_acceleration * pow(dt[i], 2) * 0.5) - (1 ? (owner_velocity * (inheritence * full_time)) : FVector()));
+    ping_prediction = prediction = (target_location + (target_velocity * full_time * 1) + (target_acceleration * pow(full_time, 2) * 0.5) - (1 ? (owner_velocity * (inheritence * full_time)) : FVector()));
 
+    *output_vector = ping_prediction;
+
+    return true;
+}
+
+bool PredictAimAtTarget(game_data::information::Player* target_player, FVector* output_vector, FVector offset) {
+    float projectileSpeed;
+    float inheritence;
+    float ping;
+
+    switch (game_data::my_player.weapon_) {
+        using namespace game_data::information;
+        case game_data::Weapon::disk:
+            projectileSpeed = weapon_speeds.disk.bullet_speed;
+            inheritence = weapon_speeds.disk.inheritence;
+            ping = aimbot::aimbot_settings.tempest_ping_in_ms;
+            break;
+        case game_data::Weapon::cg:
+            projectileSpeed = weapon_speeds.chaingun.bullet_speed;
+            inheritence = weapon_speeds.chaingun.inheritence;
+            ping = aimbot::aimbot_settings.chaingun_ping_in_ms;
+            break;
+        case game_data::Weapon::gl:
+            projectileSpeed = weapon_speeds.grenadelauncher.bullet_speed;
+            inheritence = weapon_speeds.grenadelauncher.inheritence;
+            ping = aimbot::aimbot_settings.grenadelauncher_ping_in_ms;
+            break;
+        case game_data::Weapon::plasma:
+            projectileSpeed = weapon_speeds.plasma.bullet_speed;
+            inheritence = weapon_speeds.plasma.inheritence;
+            ping = aimbot::aimbot_settings.plasmagun_ping_in_ms;
+            break;
+        case game_data::Weapon::blaster:
+            projectileSpeed = weapon_speeds.blaster.bullet_speed;
+            inheritence = weapon_speeds.blaster.inheritence;
+            ping = aimbot::aimbot_settings.blaster_ping_in_ms;
+            break;
+        case game_data::Weapon::none:
+        case game_data::Weapon::unknown:
+        default:
+            return false;
+    }
+
+    if (game_data::my_player.weapon_type_ == game_data::WeaponType::kHitscan) {
+        *output_vector = target_player->location_;
+        return true;
+    }
+
+    /*
+    if (game_data::my_player.weapon_type_ == game_data::WeaponType::kProjectileArching) {
+        return PredictAimAtTargetDL(target_player, output_vector, offset);
+    }
+    */
+
+    if (game_data::my_player.weapon_type_ != game_data::WeaponType::kProjectileArching && game_data::my_player.weapon_type_ != game_data::WeaponType::kProjectileLinear)
+        return false;
+
+    FVector owner_location = game_data::my_player.location_ - offset * 0;
+    FVector owner_velocity = game_data::my_player.velocity_;
+
+    // owner_location = owner_location - owner_velocity * (weapon_parameters_.self_compensation_ping_ / 1000.0);
+
+    FVector target_location = target_player->location_;
+    FVector target_velocity = target_player->velocity_;
+
+    /*
+    a_ = (v-u)/t
+    acceleration is normalised -> a = a_ / |a_|
+    */
+    FVector target_acceleration = FVector();
+    if (aimbot::aimbot_settings.use_acceleration && (!aimbot_settings.use_acceleration_cg_only || (aimbot_settings.use_acceleration_cg_only && (game_data::game_data.my_player_information.weapon_ == game_data::Weapon::cg || game_data::game_data.my_player_information.weapon_ == game_data::Weapon::blaster)))) {
+        FVector velocity_previous = FVector();
+        bool player_found = false;
+        for (vector<game_data::information::Player>::iterator player = players_previous.begin(); player != players_previous.end(); player++) {
+            if (player->character_ == target_player->character_) {
+                player_found = true;
+                velocity_previous = player->velocity_;
+                break;
+            }
+        }
+
+        if (player_found) {
+            target_acceleration = (target_velocity - velocity_previous) / (delta_time / 1000.0);  // should be dividing by 1000 to get ms in seconds  //(aimbot::aimbot_settings.acceleration_delta_in_ms/1000.0);
+        }
+    }
+
+    FVector target_ping_prediction = target_location + (target_velocity * ping / 1000.0 * 1) + (target_acceleration * pow(ping / 1000.0, 2) * 0.5);
+    FVector prediction = target_ping_prediction;
+    FVector ping_prediction = target_ping_prediction;
+
+    /* static */ vector<double> D(aimbot_parameters_.maximum_iterations, 0);
+    /* static */ vector<double> dt(aimbot_parameters_.maximum_iterations, 0);
+
+    int i = 0;
+    do {
+        D[i] = (owner_location - prediction).Magnitude();
+        dt[i] = D[i] / projectileSpeed;
+        if (i > 0 && abs(dt[i] - dt[i - 1]) < aimbot_parameters_.epsilon) {
+            break;
+        }
+
+        prediction = target_ping_prediction + (target_velocity * dt[i] * 1) + (target_acceleration * pow(dt[i], 2) * 0.5) - (owner_velocity * inheritence * dt[i]);
+        i++;
+    } while (i < aimbot_parameters_.maximum_iterations);
+
+    if (i == aimbot_parameters_.maximum_iterations) {
+        return false;
+    }
+
+    ping_prediction = prediction = target_ping_prediction + (target_velocity * dt[i] * 1) + (target_acceleration * pow(dt[i], 2) * 0.5) - (owner_velocity * inheritence * dt[i]);
     *output_vector = ping_prediction;
 
     return true;
@@ -1089,7 +1200,7 @@ void Tick(void) {
         if (enabled && FindTarget() /*&& target_player.character_*/) {
             bool result = PredictAimAtTarget(&target_player, &prediction, muzzle_offset);
 
-            if (result) {
+            if (result && game_functions::IsInFieldOfView(prediction)) {
                 FVector2D projection = game_functions::Project(prediction);
                 float height = -1;
 
@@ -1136,7 +1247,7 @@ void Tick(void) {
 
             bool result = PredictAimAtTarget(&*p, &prediction, muzzle_offset);
 
-            if (result) {
+            if (result && game_functions::IsInFieldOfView(prediction)) {
                 FVector2D projection = game_functions::Project(prediction);
                 float height = -1;
 
@@ -1530,7 +1641,7 @@ void DrawInformationMenuNew(void) {
         ImGui::Indent();
         const char* info0 =
             "descension v1.6 (Public)\n"
-            "Released: 15/07/2022\n";
+            "Released: 16/07/2022\n";
         //"Game version: -";
 
         const char* info1 =
