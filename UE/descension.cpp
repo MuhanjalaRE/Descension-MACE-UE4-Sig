@@ -123,8 +123,16 @@ struct Marker {
 
     struct LineSettings {
         int line_thickness = 1;
-        ImColor enemy_player_line_colour = {255, 255, 255, 65};
+        ImColor enemy_player_line_colour = {255, 0, 0, 200};
     } line_settings;
+
+    struct NameSettings {
+        ImColor enemy_name_colour = {255, 255, 0, 1 * 255};
+        ImColor friendly_name_colour = {0, 255, 0, 1 * 255};
+        float scale = 1.0;
+        int name_height_offset = 30;
+    } name_settings;
+
 } esp_visual_settings;
 
 /* static */ struct CrosshairSettings : Marker {
@@ -357,6 +365,9 @@ struct Player : public GameActor {
     Weapon weapon_ = Weapon::none;
     WeaponType weapon_type_ = WeaponType::kHitscan;
 
+    wstring name_w_;
+    string name_c_;
+
     void Reset(void) {
         character_ = NULL;
         is_valid_ = false;
@@ -395,6 +406,12 @@ struct Player : public GameActor {
         character_ = character;
 
         is_valid_ = true;
+
+        if (character->PlayerState->PlayerName.IsValid())
+            name_w_ = wstring(character->PlayerState->PlayerName.cw_str());
+        else
+            name_w_ = L"";
+        name_c_ = string(name_w_.begin(), name_w_.end());
     }
 };
 
@@ -732,6 +749,7 @@ namespace esp {
     int player_width = 0;
     float width_to_height_ratio = 0.5;
     bool show_lines = true;
+    bool show_names = false;
 } esp_settings;
 
 /* static */ Timer get_esp_data_timer(esp_settings.poll_frequency);
@@ -740,6 +758,7 @@ struct ESPInformation {
     FVector2D projection;  // center
     float height;          // height for box/rectangle
     bool is_friendly = false;
+    string name;
 };
 
 vector<ESPInformation> esp_information;
@@ -774,7 +793,7 @@ void Tick(void) {
         player->location_.Z -= esp_settings.player_height;  // this is HALF the height in reality
         float height = abs(head_projection.Y - center_projection.Y);
         float width = esp_settings.width_to_height_ratio * height;
-        esp_information.push_back({center_projection, height, same_team});
+        esp_information.push_back({center_projection, height, same_team, player->name_c_});
 
         // cout << height << endl;
     }
@@ -1901,6 +1920,16 @@ void DrawESPMenuNew(void) {
             ImGui::Unindent();
         }
 
+        /*
+        if (ImGui::CollapsingHeader("Player name settings")) {
+            ImGui::Indent();
+            ImGui::Checkbox("Show player names", &esp::esp_settings.show_names);
+            // ImGui::ColorEdit4("Friendly Colour##name", &visuals::esp_visual_settings.line_settings.enemy_player_line_colour.Value.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
+            ImGui::ColorEdit4("Enemy Colour##name", &visuals::esp_visual_settings.name_settings.enemy_name_colour.Value.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_None | ImGuiColorEditFlags_AlphaBar);
+            ImGui::Unindent();
+        }
+        */
+
         ImGui::EndTable();
     }
 }
@@ -2219,6 +2248,17 @@ void DrawImGuiInUE4(void) {
 
             if (esp::esp_settings.show_lines && !esp_information->is_friendly) {
                 imgui_draw_list->AddLine({game_data::screen_size.X / 2, game_data::screen_size.Y}, {projection.x, projection.y + box_size_height}, visuals::esp_visual_settings.line_settings.enemy_player_line_colour, visuals::esp_visual_settings.line_settings.line_thickness);
+            }
+
+            if (esp::esp_settings.show_names && !esp_information->is_friendly) {
+                ImColor colour = visuals::esp_visual_settings.name_settings.enemy_name_colour;
+                colour = (esp_information->is_friendly) ? visuals::esp_visual_settings.name_settings.friendly_name_colour : visuals::esp_visual_settings.name_settings.enemy_name_colour;
+                ImGui::GetFont()->Scale = visuals::esp_visual_settings.name_settings.scale;
+                ImGui::PushFont(ImGui::GetFont());
+                ImVec2 text_size = ImGui::CalcTextSize(esp_information->name.c_str());
+                imgui_draw_list->AddText({projection.x - text_size.x / 2, projection.y - box_size_height - text_size.y - visuals::esp_visual_settings.name_settings.name_height_offset}, colour, esp_information->name.c_str());
+                ImGui::GetFont()->Scale = 1;
+                ImGui::PopFont();
             }
         }
 
